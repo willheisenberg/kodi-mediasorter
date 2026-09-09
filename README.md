@@ -11,14 +11,14 @@ Downloads land loose in the root of the media drive. The add-on works out what
 they are and moves them where Kodi will find them:
 
 ```
-lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv
-  ↳ Serien/Lanterns/Season 01/
+example.s01e01.german.dl.1080p.web.h264-group.mkv
+  ↳ Serien/Example/Season 01/
 
-Blade.Runner.1982.German.DL.1080p.BluRay.x264-AVG/
-  ↳ Movies/Blade.Runner.1982.German.DL.1080p.BluRay.x264-AVG/
+Example.Movie.2019.German.DL.1080p.BluRay.x264-GROUP/
+  ↳ Movies/Example.Movie.2019.German.DL.1080p.BluRay.x264-GROUP/
 
-Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF/
-  ↳ Serien/Reacher/Season 04/   (pack is broken open, episodes filed one by one)
+Example.Show.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP/
+  ↳ Serien/Example Show/Season 04/   (pack is broken open, episodes filed one by one)
 ```
 
 Nothing is ever renamed, and nothing is ever overwritten.
@@ -47,7 +47,7 @@ Four layers back this up, from exact to heuristic:
 2. **RAR guard** — while `.rar`, `.r00` or `.partNN.rar` sit in the folder and
    were touched recently, the folder is left alone
 3. **Extension filter** — `.part`, `.jdtmp`, `.!qB`, `.crdownload` and friends,
-   anchored to the end of the name (otherwise `Dune.Part.Two` counts as
+   anchored to the end of the name (otherwise `Example.Part.Two` counts as
    unfinished forever)
 4. **Stability window** — size and mtime unchanged across several ticks
 
@@ -55,8 +55,8 @@ If an `.sfv` is present, every file it lists must exist as well.
 
 ## Title lookup without an API key
 
-Turning `dark.matter.der.zeitenlaeufer.s02e01` into
-`Serien/Dark Matter/Season 02/` needs the real show title. The cascade runs
+Turning `deep.signal.die.rueckkehr.s02e01` into
+`Serien/Deep Signal/Season 02/` needs the real show title. The cascade runs
 from strong to weak and stops as soon as it has an answer:
 
 | Stage | Source | Network |
@@ -76,18 +76,18 @@ Stage 3 also resolves the short names release groups use, by testing whether the
 abbreviation reads as a chain of word beginnings of a known title:
 
 ```
-blarun → Blade Runner        dar.ma → Dark Matter
-tdk    → The Dark Knight     houdra → House of the Dragon
-bsg    → no match, that is a syllable abbreviation
+neohar → Neon Harbor          dee.si → Deep Signal
+tso    → The Silent Order     palsu  → Palace of the Sun
+nbs    → no match, that is a syllable abbreviation
 ```
 
 It only accepts a single hit. With two candidates the file goes to the queue
 rather than to the wrong place.
 
 Stage 4 decides on name equality, not on score distance. Two shows sharing a
-name — `Battlestar Galactica` 2003 and 1978 — cannot be told apart and are
-rejected. `House of the Dragon` against the companion documentary
-`Enter the House of the Dragon` can.
+name — two seasons of the same franchise — cannot be told apart and are
+rejected. A title that matches the search term exactly, against a
+companion documentary with a longer name, can.
 
 ## The queue clears itself
 
