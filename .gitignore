@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Laufzeitdaten des Addons (entstehen in Kodis Profilordner, nie im Repo)
+cache.json
+queue.json
+moves.log
+
+# Editoren und Betriebssysteme
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Kodi-Pakete
+*.zip
+
+# Entwurf und Umsetzungsplan bleiben lokal
+docs/superpowers/

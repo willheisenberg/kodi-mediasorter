@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings version="1">
+  <section id="service.mediasorter">
+    <category id="pfade" label="Pfade">
+      <group id="1">
+        <setting id="watch_path" type="path" label="Überwachter Ordner">
+          <level>0</level>
+          <default>/var/media/MOVIES</default>
+          <constraints><writable>true</writable></constraints>
+          <control type="button" format="path"/>
+        </setting>
+        <setting id="series_path" type="string" label="Ziel für Serien">
+          <level>0</level>
+          <default>Serien</default>
+          <control type="edit" format="string"/>
+        </setting>
+        <setting id="movies_path" type="string" label="Ziel für Filme">
+          <level>0</level>
+          <default>Movies</default>
+          <control type="edit" format="string"/>
+        </setting>
+        <setting id="ignore_list" type="string" label="Ignorierte Ordner (Komma)">
+          <level>0</level>
+          <default>Musik,Training,youtubePlaylists,lost+found</default>
+          <control type="edit" format="string"/>
+        </setting>
+      </group>
+    </category>
+    <category id="verhalten" label="Verhalten">
+      <group id="1">
+        <setting id="dry_run" type="boolean" label="Nur protokollieren, nichts verschieben">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="interval_seconds" type="integer" label="Takt in Sekunden">
+          <level>0</level>
+          <default>30</default>
+          <constraints><minimum>10</minimum><maximum>3600</maximum></constraints>
+          <control type="slider" format="integer"/>
+        </setting>
+        <setting id="stability_cycles" type="integer" label="Stabile Takte bis fertig">
+          <level>0</level>
+          <default>2</default>
+          <constraints><minimum>1</minimum><maximum>10</maximum></constraints>
+          <control type="slider" format="integer"/>
+        </setting>
+        <setting id="rar_quiet_seconds" type="integer" label="Ruhe nach RAR-Änderung (Sekunden)">
+          <level>0</level>
+          <default>120</default>
+          <constraints><minimum>0</minimum><maximum>3600</maximum></constraints>
+          <control type="slider" format="integer"/>
+        </setting>
+        <setting id="notify" type="boolean" label="Benachrichtigungen anzeigen">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="library_scan" type="boolean" label="Bibliothek nach dem Verschieben aktualisieren">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
+      </group>
+    </category>
+    <category id="dienste" label="Dienste">
+      <group id="1">
+        <setting id="opensubtitles_api_key" type="string" label="OpenSubtitles API-Key">
+          <level>0</level>
+          <default></default>
+          <control type="edit" format="string"/>
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>

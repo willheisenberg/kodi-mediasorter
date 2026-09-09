@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="service.mediasorter" name="Media Sorter" version="0.1.0" provider-name="tesla">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+  </requires>
+  <extension point="xbmc.service" library="service.py" start="startup"/>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="de_DE">Sortiert neue Film- und Seriendateien automatisch ein</summary>
+    <description lang="de_DE">Überwacht ein Verzeichnis auf neue Downloads, erkennt Filme und Serienfolgen und verschiebt sie in die passende Bibliotheksstruktur.</description>
+    <platform>all</platform>
+    <license>MIT</license>
+    <source>https://github.com/willheisenberg/kodi-mediasorter</source>
+    <assets>
+      <icon>resources/icon.png</icon>
+      <fanart>resources/fanart.jpg</fanart>
+    </assets>
+  </extension>
+</addon>
