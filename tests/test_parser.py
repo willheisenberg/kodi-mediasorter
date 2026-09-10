@@ -138,3 +138,40 @@ def test_echte_release_ordner_sind_sprechend(name):
 @pytest.mark.parametrize("name", STUMM)
 def test_echte_kurznamen_sind_nicht_sprechend(name):
     assert not parser.ist_sprechend(name)
+
+
+# --- Kurzschema: gruppe-zusammengeschriebenertitel-aufloesung-sXXeYY ---
+
+def test_kurzschema_technikmarker_am_titelende_entfernt():
+    r = parser.parse("4gr-nightsignal-1080p-s05e01.mkv")
+    assert r["typ"] == "episode"
+    assert r["titel"] == "4gr nightsignal"
+    assert (r["staffel"], r["episode"]) == (5, 1)
+
+
+def test_marker_am_titelanfang_bleiben_stehen():
+    """Nur am Ende wird abgeschnitten, sonst verloere Web Therapy ein Wort."""
+    r = parser.parse("web.therapy.s01e01.german.dl.1080p.web.h264-group.mkv")
+    assert r["titel"] == "web therapy"
+
+
+def test_sprachwort_am_titelende_bleibt_stehen():
+    """Nur Technikmarker fallen weg, 'German' kann Teil eines Titels sein."""
+    r = parser.parse("the.good.german.s01e01.1080p.web.h264-group.mkv")
+    assert r["titel"] == "the good german"
+
+
+def test_titel_kandidaten_kurzschema():
+    assert parser.titel_kandidaten("4gr-nightsignal-1080p-s05e01.mkv") == [
+        "4gr nightsignal", "nightsignal",
+    ]
+
+
+def test_titel_kandidaten_punktschema_wird_nicht_gekuerzt():
+    assert parser.titel_kandidaten(
+        "deep.signal.die.rueckkehr.s02e01.german.dl.1080p.web.h264-crew.mkv"
+    ) == ["deep signal die rueckkehr"]
+
+
+def test_titel_kandidaten_ohne_titel_leer():
+    assert parser.titel_kandidaten("1080p-s01e01.mkv") == []

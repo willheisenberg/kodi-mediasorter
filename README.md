@@ -65,7 +65,7 @@ from strong to weak and stops as soon as it has an answer:
 | 1 | IMDb ID from the `.nfo` → TVmaze lookup | yes |
 | 2 | Cache from earlier runs | no |
 | 3 | Match against existing folders, exact or by abbreviation | no |
-| 4 | TVmaze title search | yes |
+| 4 | TVmaze title search, also for run-together titles | yes |
 | 5 | OpenSubtitles hash over the file contents | yes, with key |
 | 6 | Queue, retried automatically | no |
 
@@ -84,6 +84,15 @@ nbs    → no match, that is a syllable abbreviation
 It only accepts a single hit. With two candidates the file goes to the queue
 rather than to the wrong place.
 
+Loose files also turn up in a compact form such as
+`4gr-nightsignal-1080p-s05e01.mkv`: group tag first, quality before the episode
+marker, title run together. Resolution and codec at the end of the title are
+dropped, and the title is tried both with and without the leading tag. TVmaze
+cannot find a run-together title like `nightsignal`, but it does find its first
+word, so the add-on searches by growing prefixes and accepts a show only if its
+name, with spaces removed, equals the token exactly: `Night Signal` →
+`nightsignal`.
+
 Stage 4 decides on name equality, not on score distance. Two shows sharing a
 name — two seasons of the same franchise — cannot be told apart and are
 rejected. A title that matches the search term exactly, against a
@@ -95,6 +104,10 @@ Anything that cannot be placed stays put and is reassessed on every tick. When
 a later episode arrives with a full name, the show folder appears — and the
 previously unreadable short name finds it through stage 3 and gets filed after
 the fact, with nobody doing anything. The same happens once an `.nfo` shows up.
+
+Online lookups that fail rest for six hours, so a waiting file does not hit
+TVmaze every 30 seconds. The local stages keep running on every tick, so a
+newly created show folder still takes effect right away.
 
 ## Installing
 
@@ -123,7 +136,7 @@ the target paths, then switch it live.
 | Stable ticks until done | 2 | Layer 4 of the readiness check |
 | Quiet time after RAR change | 120 | Layer 2, in seconds |
 | Notifications | on | Kodi toast after filing |
-| Update library | on | Targeted scan of the destination path only |
+| Update library | on | Targeted scan of the show or movie folder that changed |
 | OpenSubtitles API key | empty | Optional, unlocks stage 5 |
 
 Target paths may be relative or absolute, but they have to sit on the same drive
@@ -132,6 +145,13 @@ is atomic and takes milliseconds. Crossing drives would mean copying, and a
 copy running for minutes would need locking, a worker thread and cleanup logic
 for aborted transfers. If a target is on another drive, the add-on stays idle
 and says exactly that.
+
+The library scan asks Kodi for its video sources and rewrites the target into
+the spelling of the matching source. Kodi compares paths as text, so a scan of
+`/var/media/MOVIES/Serien/…` does nothing when the source is registered as
+`/media/MOVIES/Serien/`, even though one is a symlink to the other. If a target
+lies in no Kodi source, the add-on logs a warning instead of sending a scan that
+silently does nothing.
 
 ## What it will not do
 
@@ -151,7 +171,7 @@ so any step can be undone by hand.
 ## Development
 
 ```bash
-python3 -m pytest          # 165 tests, all offline
+python3 -m pytest          # 188 tests, all offline
 ```
 
 The suite blocks HTTP calls globally; tests that genuinely need the network

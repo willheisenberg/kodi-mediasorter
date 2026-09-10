@@ -83,3 +83,9 @@ def test_cache_uebersteht_kaputte_datei(tmp_path):
 def test_titel_mit_jahr_matcht_ordner_ohne_jahr():
     """deep signal (2024) muss den Ordner Deep Signal finden."""
     assert resolver.finde_bestehenden_ordner("deep signal", BESTAND) == "Deep Signal"
+
+
+def test_zusammengeschriebener_titel_findet_bestehenden_ordner():
+    assert resolver.finde_bestehenden_ordner(
+        "nightsignal", ["Night Signal", "Ranger"]
+    ) == "Night Signal"

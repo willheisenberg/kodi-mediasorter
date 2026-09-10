@@ -124,7 +124,7 @@ def test_opensubtitles_ohne_key_wird_uebersprungen():
 
 
 def test_opensubtitles_liefert_serie():
-    antwort = {"data": [{"attributes": {"feature_dtls": {
+    antwort = {"data": [{"attributes": {"feature_details": {
         "title": "Deep Signal", "season_number": 2, "episode_number": 1,
         "feature_type": "Episode"}}}]}
     r = resolver.opensubtitles_per_hash("abc", "SCHLUESSEL", oeffner_mit(antwort))
@@ -164,3 +164,53 @@ def test_tvmaze_nimmt_besten_bei_klarem_abstand_ohne_exakten_namen():
         {"score": 0.33, "show": {"name": "Patterns"}},
     ]
     assert resolver.tvmaze_per_name("lantern", oeffner_mit(treffer)) == "Example"
+
+
+import urllib.parse
+
+
+def oeffner_nach_suchwort(antworten, aufrufe):
+    def oeffnen(url, timeout=None):
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["q"][0]
+        aufrufe.append(q)
+        return FakeAntwort(json.dumps(antworten.get(q, [])).encode("utf-8"))
+    return oeffnen
+
+
+def test_zusammengeschrieben_findet_serie_ueber_wortanfang():
+    """Echter Befund: der Wortanfang liefert die Serie, das Ganze nicht."""
+    aufrufe = []
+    antworten = {"night": [
+        {"score": 0.89, "show": {"id": 1, "name": "Night"}},
+        {"score": 0.68, "show": {"id": 2, "name": "Night Signal"}},
+    ]}
+    ergebnis = resolver.tvmaze_zusammengeschrieben(
+        "nightsignal", oeffner_nach_suchwort(antworten, aufrufe)
+    )
+    assert ergebnis == "Night Signal"
+    assert aufrufe[-1] == "night", "stoppt beim ersten exakten Treffer"
+
+
+def test_zusammengeschrieben_verlangt_exakte_gleichheit():
+    antworten = {"night": [{"score": 1.0, "show": {"id": 3, "name": "Night Signals"}}]}
+    assert resolver.tvmaze_zusammengeschrieben(
+        "nightsignal", oeffner_nach_suchwort(antworten, [])
+    ) is None
+
+
+def test_zusammengeschrieben_lehnt_namensgleiche_serien_ab():
+    antworten = {"night": [
+        {"score": 1.0, "show": {"id": 4, "name": "Night Signal"}},
+        {"score": 1.0, "show": {"id": 5, "name": "Night Signal"}},
+    ]}
+    assert resolver.tvmaze_zusammengeschrieben(
+        "nightsignal", oeffner_nach_suchwort(antworten, [])
+    ) is None
+
+
+def test_zusammengeschrieben_fragt_nicht_bei_kurzen_oder_getrennten_titeln():
+    aufrufe = []
+    oeffnen = oeffner_nach_suchwort({}, aufrufe)
+    assert resolver.tvmaze_zusammengeschrieben("night signal", oeffnen) is None
+    assert resolver.tvmaze_zusammengeschrieben("xyz", oeffnen) is None
+    assert aufrufe == []

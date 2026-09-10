@@ -30,6 +30,13 @@ _MARKER = re.compile(
 # bhx-neohar-x265 haben nur einen und sind kein Titel.
 _MARKER_MINDESTZAHL = 3
 
+# Technische Marker, die im Kurzschema gruppe-titel-1080p-s05e01 zwischen Titel
+# und Episodenmarke stehen. Bewusst ohne Sprachwoerter wie german oder dl.
+_TECHNIK = re.compile(
+    r"(?i)^(2160p|1080p|720p|576p|480p|x264|x265|h264|h265|hevc|avc"
+    r"|bluray|webrip|webdl|hdtv|dvdrip|remux|uhd|hdr)$"
+)
+
 
 def basisname(name):
     """Name ohne die letzte Endung."""
@@ -47,6 +54,19 @@ def _normalisiere(text):
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
+def _ohne_technik_am_ende(titel):
+    """Schneidet Aufloesung und Codec am Titelende ab.
+
+    Das Kurzschema gruppe-titel-1080p-s05e01 stellt die Qualitaet vor die
+    Episodenmarke. Nur am Ende und nur Technikmarker, damit Titel wie
+    Web Therapy oder The Good German unversehrt bleiben.
+    """
+    woerter = titel.split()
+    while woerter and _TECHNIK.match(woerter[-1]):
+        woerter.pop()
+    return " ".join(woerter)
+
+
 def _ohne_endung(name):
     if ist_video(name):
         return basisname(name)
@@ -57,7 +77,7 @@ def _erscheinungsjahr(name):
     """Letztes plausibles Jahr im Namen.
 
     Neon.Harbor.2049.2017 liefert 2017, weil 2049 in der Zukunft liegt und
-    damit zum Titel gehoert. 1999.Reise.zum.Mond.1972 liefert 1968, weil
+    damit zum Titel gehoert. 1999.Reise.zum.Mond.1972 liefert 1972, weil
     das letzte plausible Jahr gewinnt.
     """
     grenze = datetime.date.today().year + 1
@@ -95,7 +115,7 @@ def parse(name):
     for muster in (_EPISODE, _EPISODE_X, _EPISODE_DE):
         treffer = muster.search(rumpf)
         if treffer:
-            titel = _normalisiere(rumpf[: treffer.start()])
+            titel = _ohne_technik_am_ende(_normalisiere(rumpf[: treffer.start()]))
             return {
                 "typ": "episode",
                 "titel": titel,
@@ -125,3 +145,31 @@ def parse(name):
         "episode": None,
         "jahr": None,
     }
+
+
+def titel_kandidaten(name):
+    """Suchbegriffe fuer den Resolver, der wahrscheinlichste zuerst.
+
+    Im Kurzschema gruppe-titel-1080p-s05e01 steht vorne ein Gruppenkuerzel.
+    Es wird nicht geloescht, weil es auch ein echtes erstes Titelwort sein
+    kann; stattdessen kommt der Titel ohne erstes Wort als zweiter Kandidat
+    dazu. Welcher stimmt, entscheidet der Treffer.
+    """
+    titel = parse(name)["titel"]
+    if not titel:
+        return []
+    kandidaten = [titel]
+
+    rumpf = _ohne_endung(name)
+    vorspann = rumpf
+    for muster in (_EPISODE, _EPISODE_X, _EPISODE_DE):
+        treffer = muster.search(rumpf)
+        if treffer:
+            vorspann = rumpf[: treffer.start()]
+            break
+
+    woerter = titel.split()
+    kurzschema = "-" in vorspann and not re.search(r"[._\s]", vorspann)
+    if kurzschema and len(woerter) >= 2 and len(woerter[0]) <= 5:
+        kandidaten.append(" ".join(woerter[1:]))
+    return kandidaten

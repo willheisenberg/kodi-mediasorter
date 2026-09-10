@@ -3,6 +3,7 @@
 Kodi-frei und damit vollstaendig testbar. service.py ruft nur einmal() auf.
 """
 import os
+import time
 
 import log
 import mover
@@ -12,6 +13,11 @@ import planner
 import readiness
 import resolver
 import scanner
+
+
+# Wie lange ein fehlgeschlagener Online-Lookup ruht. Ohne diese Sperre fragte
+# die Warteschlange TVmaze fuer jeden wartenden Eintrag bei jedem Takt neu.
+SPERRE_SEKUNDEN = 6 * 3600
 
 
 class Zustand:
@@ -24,6 +30,16 @@ class Zustand:
             os.path.join(datenordner, "queue.json")
         )
         self.protokoll = os.path.join(datenordner, "moves.log")
+        # Nur im Speicher: ein Neustart des Dienstes hebt alle Sperren auf.
+        self.uhr = time.time
+        self._sperre = {}
+
+    def gesperrt(self, schluessel):
+        bis = self._sperre.get(schluessel)
+        return bis is not None and self.uhr() < bis
+
+    def sperren(self, schluessel):
+        self._sperre[schluessel] = self.uhr() + SPERRE_SEKUNDEN
 
 
 def _dateien_von(kandidat):
@@ -71,8 +87,7 @@ def loese_titel(kandidat, cfg, zustand):
     """Die Resolver-Kaskade. None heisst: Film oder Warteschlange."""
     pfad = kandidat["pfad"]
     name = kandidat["name"]
-    info = parser.parse(name)
-    suchtitel = info["titel"]
+    titelquelle = name
 
     if kandidat["ist_ordner"]:
         # Bei Ordnern entscheidet der Inhalt, nicht der Ordnername.
@@ -82,56 +97,86 @@ def loese_titel(kandidat, cfg, zustand):
         if not episoden:
             return None                 # Filmordner, braucht keinen Titel
         erste = sorted(episoden.items())[0][1][0]
-        aus_datei = parser.parse(erste)["titel"]
-        if aus_datei:
-            suchtitel = aus_datei       # Stufe 0: Dateiname im Ordner ist praeziser
-    elif info["typ"] == "film":
+        if parser.parse(erste)["titel"]:
+            titelquelle = erste         # Stufe 0: Dateiname im Ordner ist praeziser
+    elif parser.parse(name)["typ"] == "film":
         return None                     # Filme brauchen keinen Titel-Lookup
 
+    kandidaten = parser.titel_kandidaten(titelquelle) or parser.titel_kandidaten(name)
+    haupttitel = kandidaten[0] if kandidaten else None
     vorhandene = resolver.vorhandene_serien(cfg.ziel_serien())
 
+    def merke(wert, *schluessel):
+        for s in schluessel:
+            if s:
+                zustand.cache.setze(s, wert)
+        return wert
+
     # Stufe 2: Cache
-    if suchtitel:
-        gemerkt = zustand.cache.hole(suchtitel)
+    for k in kandidaten:
+        gemerkt = zustand.cache.hole(k)
         if gemerkt:
             return gemerkt
 
-    # Stufe 3: bestehende Ordner, exakt oder per Abkuerzung. Bewusst ohne
-    # Cache-Eintrag: lokal und billig, und ein Cache wuerde nach dem
-    # Umbenennen eines Serienordners ins Leere zeigen.
-    if suchtitel:
-        treffer = resolver.finde_bestehenden_ordner(suchtitel, vorhandene)
+    # Stufe 3: bestehende Ordner, exakt, zusammengeschrieben oder per
+    # Abkuerzung. Bewusst ohne Cache-Eintrag und ohne Sperre: lokal und
+    # billig, und ein Cache wuerde nach dem Umbenennen ins Leere zeigen.
+    for k in kandidaten:
+        treffer = resolver.finde_bestehenden_ordner(k, vorhandene)
         if treffer:
             return treffer
 
     # Stufe 1: IMDb-ID aus NFO
     ordner = pfad if kandidat["ist_ordner"] else os.path.dirname(pfad)
     tt = resolver.imdb_id_aus_ordner(ordner)
-    if tt:
+    if tt and not zustand.gesperrt("imdb:" + tt):
         name_von_imdb = resolver.tvmaze_per_imdb(tt)
         if name_von_imdb:
-            zustand.cache.setze(suchtitel or tt, name_von_imdb)
-            return name_von_imdb
+            return merke(name_von_imdb, haupttitel or tt)
+        zustand.sperren("imdb:" + tt)
 
-    # Stufe 4: Namenssuche
-    if suchtitel:
-        gefunden = resolver.tvmaze_per_name(suchtitel)
+    # Stufe 4: Namenssuche, bei zusammengeschriebenen Titeln per Wortanfang
+    for k in kandidaten:
+        # Ein gekuerzter Kandidat wie nbs ist fuer Stufe 3 wertvoll, online
+        # aber zu kurz: TVmaze faende womoeglich eine Serie, die zufaellig so heisst.
+        if k != haupttitel and len(k.replace(" ", "")) < 6:
+            continue
+        if zustand.gesperrt("titel:" + k):
+            continue
+        gefunden = resolver.tvmaze_per_name(k)
+        if not gefunden and " " not in k:
+            gefunden = resolver.tvmaze_zusammengeschrieben(k)
         if gefunden:
-            zustand.cache.setze(suchtitel, gefunden)
-            return gefunden
+            return merke(gefunden, haupttitel, k)
+        zustand.sperren("titel:" + k)
 
     # Stufe 5: Inhaltserkennung, nur mit API-Key und nur fuer Einzeldateien
-    if cfg.opensubtitles_api_key and not kandidat["ist_ordner"]:
+    if (cfg.opensubtitles_api_key and not kandidat["ist_ordner"]
+            and not zustand.gesperrt("hash:" + pfad)):
         hashwert = resolver.opensubtitles_hash(pfad)
         if hashwert:
             daten = resolver.opensubtitles_per_hash(
                 hashwert, cfg.opensubtitles_api_key
             )
             if daten and daten.get("titel"):
-                zustand.cache.setze(suchtitel or hashwert, daten["titel"])
-                return daten["titel"]
+                return merke(daten["titel"], haupttitel or hashwert)
+        zustand.sperren("hash:" + pfad)
 
     return None
+
+
+def _scanziel(ziel, cfg):
+    """Ordner, den Kodi nach dem Verschieben scannen soll.
+
+    Die erste Ebene unter dem Serien- bzw. Filmziel, also der Serienordner oder
+    der Filmordner. Nachgewiesen ist der Scan auf Serienordner-Ebene, und die
+    ganze Filmquelle zu scannen waere fuer einen einzelnen Film unnoetig teuer.
+    """
+    for wurzel in (cfg.ziel_serien(), cfg.ziel_filme()):
+        rest = os.path.relpath(ziel, wurzel)
+        if rest != "." and not rest.startswith(".."):
+            return os.path.join(wurzel, rest.split(os.sep)[0])
+    return os.path.dirname(ziel)
 
 
 def einmal(cfg, zustand, spielt_gerade=None):
@@ -169,7 +214,7 @@ def einmal(cfg, zustand, spielt_gerade=None):
             ergebnis = mover.verschiebe(schritt, cfg.dry_run, zustand.protokoll)
             if ergebnis == mover.ERFOLG:
                 zaehler["verschoben"] += 1
-                zaehler["zielpfade"].add(os.path.dirname(schritt.ziel))
+                zaehler["zielpfade"].add(_scanziel(schritt.ziel, cfg))
                 zustand.stabilitaet.vergiss(schritt.quelle)
             elif ergebnis in (mover.KOLLISION, mover.FEHLER):
                 offen = True

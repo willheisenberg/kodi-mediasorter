@@ -4,7 +4,7 @@ import config
 import durchlauf
 
 
-def baue_umgxbung(tmp_path, dry_run=False):
+def baue_umgebung(tmp_path, dry_run=False):
     (tmp_path / "Serien").mkdir()
     (tmp_path / "Movies").mkdir()
     (tmp_path / "daten").mkdir()
@@ -34,7 +34,7 @@ def stabil_machen(cfg, zustand, takte=3, **kw):
 
 
 def test_episode_landet_im_season_ordner(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     (tmp_path / "Serien" / "Ranger").mkdir()
     quelle = tmp_path / "ranger.s04e08.german.dl.1080p.web.h264-crew.mkv"
     quelle.write_bytes(b"x" * 100)
@@ -47,7 +47,7 @@ def test_episode_landet_im_season_ordner(tmp_path):
 
 
 def test_filmordner_landet_unter_movies(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     ordner = tmp_path / "Neon.Harbor.1982.German.DL.1080p.BluRay.x264-AVX"
     ordner.mkdir()
     (ordner / "film.mkv").write_bytes(b"x" * 100)
@@ -58,7 +58,7 @@ def test_filmordner_landet_unter_movies(tmp_path):
 
 
 def test_unbekannte_serie_geht_in_die_warteschlange(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     quelle = tmp_path / "xyz.s01e01.mkv"
     quelle.write_bytes(b"x" * 100)
 
@@ -70,7 +70,7 @@ def test_unbekannte_serie_geht_in_die_warteschlange(tmp_path):
 
 def test_wiedervorlage_loest_sich_selbst_auf(tmp_path):
     """Der nbs-Fall: erst unloesbar, dann entsteht der Ordner."""
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     quelle = tmp_path / "ranger.s04e08.mkv"
     quelle.write_bytes(b"x" * 100)
 
@@ -86,7 +86,7 @@ def test_wiedervorlage_loest_sich_selbst_auf(tmp_path):
 
 def test_unfertige_datei_wird_nicht_angefasst(tmp_path):
     """MKV mit Sollgroesse 5000, aber nur 100 Bytes geschrieben."""
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     (tmp_path / "Serien" / "Ranger").mkdir()
 
     from test_readiness_groesse import baue_mkv
@@ -101,7 +101,7 @@ def test_unfertige_datei_wird_nicht_angefasst(tmp_path):
 
 
 def test_rar_im_ordner_blockiert_den_durchlauf(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     ordner = tmp_path / "Neon.Harbor.1982.German.DL.1080p.BluRay.x264-AVX"
     ordner.mkdir()
     (ordner / "film.mkv").write_bytes(b"x" * 100)
@@ -113,7 +113,7 @@ def test_rar_im_ordner_blockiert_den_durchlauf(tmp_path):
 
 
 def test_kollision_ueberschreibt_nicht(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     season = tmp_path / "Serien" / "Ranger" / "Season 04"
     season.mkdir(parents=True)
     (season / "ranger.s04e08.mkv").write_bytes(b"alt")
@@ -128,7 +128,7 @@ def test_kollision_ueberschreibt_nicht(tmp_path):
 
 
 def test_dry_run_verschiebt_nichts(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path, dry_run=True)
+    cfg, zustand = baue_umgebung(tmp_path, dry_run=True)
     (tmp_path / "Serien" / "Ranger").mkdir()
     quelle = tmp_path / "ranger.s04e08.mkv"
     quelle.write_bytes(b"x" * 100)
@@ -140,7 +140,7 @@ def test_dry_run_verschiebt_nichts(tmp_path):
 
 
 def test_ignorierte_ordner_bleiben_unberuehrt(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     musik = tmp_path / "Musik"
     musik.mkdir()
     (musik / "lied.mkv").write_bytes(b"x")
@@ -151,7 +151,7 @@ def test_ignorierte_ordner_bleiben_unberuehrt(tmp_path):
 
 
 def test_laufende_wiedergabe_blockiert(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     (tmp_path / "Serien" / "Ranger").mkdir()
     quelle = tmp_path / "ranger.s04e08.mkv"
     quelle.write_bytes(b"x" * 100)
@@ -162,7 +162,7 @@ def test_laufende_wiedergabe_blockiert(tmp_path):
 
 
 def test_staffelpaket_wird_aufgebrochen(tmp_path):
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     (tmp_path / "Serien" / "Ranger").mkdir()
     paket = tmp_path / "Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP"
     paket.mkdir()
@@ -184,7 +184,7 @@ def test_stufe_drei_wird_nicht_gecacht(tmp_path):
     zeigte der Cache nach einem Umbenennen des Serienordners ins Leere und das
     Addon legte den alten Namen neu an.
     """
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     (tmp_path / "Serien" / "Ranger").mkdir()
     quelle = tmp_path / "ranger.s04e08.mkv"
     quelle.write_bytes(b"x" * 100)
@@ -210,7 +210,7 @@ def test_stufe_vier_greift_und_wird_gecacht(tmp_path, monkeypatch):
 
     monkeypatch.setattr(resolver, "tvmaze_per_name", gefaelscht)
 
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     quelle = tmp_path / "example.s01e01.german.dl.1080p.web.h264-group.mkv"
     quelle.write_bytes(b"x" * 100)
 
@@ -231,7 +231,7 @@ def test_stufe_eins_nutzt_imdb_id_aus_nfo(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(resolver, "tvmaze_per_name", lambda t, oeffner=None: None)
 
-    cfg, zustand = baue_umgxbung(tmp_path)
+    cfg, zustand = baue_umgebung(tmp_path)
     ordner = tmp_path / "Nebula.Station.S01E06.Das.Tribunal.German.720p.BluRay.x264-NSG"
     ordner.mkdir()
     (ordner / "nsg-nbs-s01e06-720p.mkv").write_bytes(b"x" * 100)
@@ -244,3 +244,106 @@ def test_stufe_eins_nutzt_imdb_id_aus_nfo(tmp_path, monkeypatch):
     ziel = tmp_path / "Serien" / "Nebula Station" / "Season 01" / ordner.name
     assert ziel.exists(), "der ganze Release-Ordner wandert"
     assert (ziel / "nsg-nbs-s01e06-720p.mkv").exists()
+
+
+def test_kurzschema_mit_zusammengeschriebenem_titel(tmp_path, monkeypatch):
+    """4gr-nightsignal-1080p-s05e01: Kuerzel weg, Titel zusammengeschrieben."""
+    import resolver
+
+    monkeypatch.setattr(resolver, "tvmaze_per_name", lambda t, oeffner=None: None)
+    monkeypatch.setattr(
+        resolver, "tvmaze_zusammengeschrieben",
+        lambda t, oeffner=None: "Night Signal" if t == "nightsignal" else None,
+    )
+    cfg, zustand = baue_umgebung(tmp_path)
+    for nr in (1, 2):
+        (tmp_path / ("4gr-nightsignal-1080p-s05e0%d.mkv" % nr)).write_bytes(b"x" * 100)
+
+    stabil_machen(cfg, zustand)
+
+    season = tmp_path / "Serien" / "Night Signal" / "Season 05"
+    assert (season / "4gr-nightsignal-1080p-s05e01.mkv").exists()
+    assert (season / "4gr-nightsignal-1080p-s05e02.mkv").exists()
+    assert zustand.cache.hole("4gr nightsignal") == "Night Signal"
+    assert zustand.warteschlange.anzahl() == 0
+
+
+def test_fehlgeschlagener_onlinelookup_ruht(tmp_path, monkeypatch):
+    """Zwei wartende Folgen, sechs Takte: TVmaze wird genau einmal gefragt."""
+    import resolver
+
+    aufrufe = []
+    monkeypatch.setattr(resolver, "tvmaze_per_name",
+                        lambda t, oeffner=None: aufrufe.append(t))
+    monkeypatch.setattr(resolver, "tvmaze_zusammengeschrieben",
+                        lambda t, oeffner=None: None)
+    cfg, zustand = baue_umgebung(tmp_path)
+    for nr in (1, 2):
+        (tmp_path / ("xyz.s01e0%d.mkv" % nr)).write_bytes(b"x" * 100)
+
+    stabil_machen(cfg, zustand, takte=6)
+
+    assert zustand.warteschlange.anzahl() == 2
+    assert aufrufe == ["xyz"]
+
+
+def test_sperre_laeuft_nach_sechs_stunden_ab(tmp_path, monkeypatch):
+    import resolver
+
+    aufrufe = []
+    monkeypatch.setattr(resolver, "tvmaze_per_name",
+                        lambda t, oeffner=None: aufrufe.append(t))
+    monkeypatch.setattr(resolver, "tvmaze_zusammengeschrieben",
+                        lambda t, oeffner=None: None)
+    cfg, zustand = baue_umgebung(tmp_path)
+    uhr = [1000.0]
+    zustand.uhr = lambda: uhr[0]
+    (tmp_path / "xyz.s01e01.mkv").write_bytes(b"x" * 100)
+
+    stabil_machen(cfg, zustand, takte=4)
+    assert aufrufe == ["xyz"]
+
+    uhr[0] += durchlauf.SPERRE_SEKUNDEN + 1
+    durchlauf.einmal(cfg, zustand)
+    assert aufrufe == ["xyz", "xyz"]
+
+
+# --- Scanziel: Serienordner bzw. Filmordner, nicht Season-Ordner oder Quelle ---
+
+def test_scanziel_bei_episoden_ist_der_serienordner(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Serien" / "Ranger").mkdir()
+    for nr in (1, 2):
+        (tmp_path / ("ranger.s04e0%d.mkv" % nr)).write_bytes(b"x" * 100)
+
+    zaehler = stabil_machen(cfg, zustand, takte=1)
+    zaehler = durchlauf.einmal(cfg, zustand)
+
+    assert zaehler["zielpfade"] == {str(tmp_path / "Serien" / "Ranger")}, \
+        "zwei Folgen, ein Scan auf Serienebene"
+
+
+def test_scanziel_bei_filmordner_ist_der_filmordner(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = tmp_path / "Neon.Harbor.1982.German.DL.1080p.BluRay.x264-AVX"
+    ordner.mkdir()
+    (ordner / "film.mkv").write_bytes(b"x" * 100)
+
+    alle = set()
+    for _ in range(3):
+        alle |= durchlauf.einmal(cfg, zustand)["zielpfade"]
+
+    assert alle == {str(tmp_path / "Movies" / ordner.name)}, \
+        "nicht die ganze Movies-Quelle"
+
+
+def test_scanziel_bei_film_als_einzeldatei_ist_der_neue_ordner(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    datei = tmp_path / "Example.Movie.2025.GERMAN.DL.1080p.WEB.H264-MGX.mkv"
+    datei.write_bytes(b"x" * 100)
+
+    alle = set()
+    for _ in range(3):
+        alle |= durchlauf.einmal(cfg, zustand)["zielpfade"]
+
+    assert alle == {str(tmp_path / "Movies" / "Example.Movie.2025.GERMAN.DL.1080p.WEB.H264-MGX")}

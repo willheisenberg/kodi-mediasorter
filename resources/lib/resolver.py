@@ -61,6 +61,11 @@ def _normal(text):
     return re.sub(r"[\s._-]+", " ", text.strip().lower())
 
 
+def _kompakt(text):
+    """Nur Buchstaben und Ziffern: 'Night Signal' und 'nightsignal' werden gleich."""
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
 def finde_bestehenden_ordner(titel, vorhandene):
     """Erst exakt ohne Ruecksicht auf Schreibweise, dann per Abkuerzung.
 
@@ -68,8 +73,9 @@ def finde_bestehenden_ordner(titel, vorhandene):
     Verwechslung lieber in der Warteschlange landet als am falschen Ort.
     """
     normal = _normal(titel)
+    kompakt = _kompakt(titel)
     for ordner in vorhandene:
-        if _normal(ordner) == normal:
+        if _normal(ordner) == normal or (kompakt and _kompakt(ordner) == kompakt):
             return ordner
 
     treffer = [o for o in vorhandene if passt_abkuerzung(titel, o)]
@@ -257,12 +263,47 @@ def opensubtitles_per_hash(hashwert, api_key, oeffner=None):
     if not eintraege:
         return None
 
-    dtls = ((eintraege[0].get("attributes") or {}).get("feature_dtls") or {})
-    if not dtls.get("title"):
+    details = ((eintraege[0].get("attributes") or {}).get("feature_details") or {})
+    if not details.get("title"):
         return None
     return {
-        "titel": dtls["title"],
-        "staffel": dtls.get("season_number"),
-        "episode": dtls.get("episode_number"),
-        "typ": "episode" if dtls.get("feature_type") == "Episode" else "film",
+        "titel": details["title"],
+        "staffel": details.get("season_number"),
+        "episode": details.get("episode_number"),
+        "typ": "episode" if details.get("feature_type") == "Episode" else "film",
     }
+
+
+def tvmaze_zusammengeschrieben(titel, oeffner=None):
+    """Serie zu einem zusammengeschriebenen Titel wie nightsignal.
+
+    TVmaze findet solche Tokens nicht, wohl aber ihre Wortanfaenge. Gefragt
+    wird deshalb mit wachsenden Praefixen, akzeptiert wird nur ein Seriename,
+    der ohne Leer- und Satzzeichen exakt dem Token entspricht. Tragen zwei
+    Serien diesen Namen, ist nichts entscheidbar.
+    """
+    token = titel.strip().lower()
+    if not re.fullmatch(r"[a-z0-9]{6,}", token):
+        return None
+
+    for laenge in range(4, len(token) - 1):
+        url = ("https://api.tvmaze.com/search/shows?q="
+               + urllib.parse.quote(token[:laenge]))
+        daten = _json_von(oeffner, url)
+        if daten is None:
+            return None                 # Netzfehler oder Limit: nicht weiterbohren
+        if not isinstance(daten, list):
+            continue
+        passend = {}
+        for eintrag in daten:
+            show = eintrag.get("show") or {}
+            name = show.get("name") or ""
+            if name and _kompakt(name) == token:
+                passend[show.get("id", name)] = name
+        if len(passend) == 1:
+            return next(iter(passend.values()))
+        if len(passend) > 1:
+            log.info("TVmaze mehrdeutig für %r: %s existiert mehrfach"
+                     % (titel, next(iter(passend.values()))))
+            return None
+    return None
