@@ -14,9 +14,9 @@ def test_temporaere_endungen_erkannt():
 
 
 def test_part_im_titel_ist_nicht_temporaer():
-    """Regressionstest: Dune.Part.Two darf nie als unfertig gelten."""
-    assert not readiness.ist_temporaer("Dune.Part.Two.2024.German.DL.1080p.BluRay.x264-DETAiLS")
-    assert not readiness.ist_temporaer("dune.part.two.2024.german.dl.1080p.bluray.x264-details.mkv")
+    """Regressionstest: Example.Part.Two darf nie als unfertig gelten."""
+    assert not readiness.ist_temporaer("Example.Part.Two.2024.German.DL.1080p.BluRay.x264-DTLS")
+    assert not readiness.ist_temporaer("example.part.two.2024.german.dl.1080p.bluray.x264-dtls.mkv")
 
 
 # --- Lage 2: RAR-Waechter ---

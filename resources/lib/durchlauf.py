@@ -76,7 +76,7 @@ def loese_titel(kandidat, cfg, zustand):
 
     if kandidat["ist_ordner"]:
         # Bei Ordnern entscheidet der Inhalt, nicht der Ordnername.
-        # Reacher.S04.COMPLETE... enthaelt kein sXXeYY und saehe sonst wie ein
+        # Ranger.S04.COMPLETE... enthaelt kein sXXeYY und saehe sonst wie ein
         # Film aus, obwohl klar benannte Episoden darin liegen.
         episoden = planner.episoden_im_ordner(pfad)
         if not episoden:

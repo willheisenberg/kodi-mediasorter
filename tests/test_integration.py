@@ -64,7 +64,7 @@ def test_lose_episoden_landen_in_der_warteschlange(welt):
     for _ in range(3):
         zaehler = durchlauf.einmal(cfg, zustand)
 
-    # lanterns und dark.matter haben keinen Serienordner und keine NFO,
+    # example und deep.signal haben keinen Serienordner und keine NFO,
     # koennen also ohne Netzwerk nicht aufgeloest werden
     assert zaehler["wartend"] >= 1
 
@@ -86,32 +86,32 @@ def test_kein_takt_wirft(welt):
 
 
 def test_scharfer_lauf_sortiert_bekannte_serien_ein(tmp_path, bestand):
-    """Mit dry_run=False: reacher und house.of.the.dragon sind aufloesbar,
-    weil ihre Ordner im Bestand existieren. Die losen lanterns-Folgen nicht.
+    """Mit dry_run=False: ranger und palace.of.the.sun sind aufloesbar, weil
+    ihre Ordner im Bestand existieren. Die losen example-Folgen nicht.
     """
     cfg, zustand = mache_welt(tmp_path, bestand, dry_run=False)
 
     # zwei lose Folgen bekannter Serien dazulegen
-    (tmp_path / "reacher.s04e08.german.dl.1080p.web.h264-wayne.mkv").write_bytes(b"")
-    (tmp_path / "house.of.the.dragon.s03e09.german.dl.1080p.web.h264-wayne.mkv").write_bytes(b"")
+    (tmp_path / "ranger.s04e08.german.dl.1080p.web.h264-crew.mkv").write_bytes(b"")
+    (tmp_path / "palace.of.the.sun.s03e09.german.dl.1080p.web.h264-crew.mkv").write_bytes(b"")
 
     for _ in range(3):
         durchlauf.einmal(cfg, zustand)
 
-    assert (tmp_path / "Serien" / "Reacher" / "Season 04"
-            / "reacher.s04e08.german.dl.1080p.web.h264-wayne.mkv").exists()
-    assert (tmp_path / "Serien" / "House of the Dragon" / "Season 03"
-            / "house.of.the.dragon.s03e09.german.dl.1080p.web.h264-wayne.mkv").exists()
+    assert (tmp_path / "Serien" / "Ranger" / "Season 04"
+            / "ranger.s04e08.german.dl.1080p.web.h264-crew.mkv").exists()
+    assert (tmp_path / "Serien" / "Palace of the Sun" / "Season 03"
+            / "palace.of.the.sun.s03e09.german.dl.1080p.web.h264-crew.mkv").exists()
     # die unbekannten bleiben liegen
-    assert (tmp_path / "lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv").exists()
+    assert (tmp_path / "example.s01e01.german.dl.1080p.web.h264-group.mkv").exists()
 
 
-def test_dolbytests_wird_nie_als_film_einsortiert(tmp_path, bestand):
-    """DolbyTests liegt schon in Movies und darf nicht angefasst werden."""
+def test_audiotests_wird_nie_als_film_einsortiert(tmp_path, bestand):
+    """AudioTests liegt schon in Movies und darf nicht angefasst werden."""
     cfg, zustand = mache_welt(tmp_path, bestand, dry_run=False)
 
     for _ in range(3):
         durchlauf.einmal(cfg, zustand)
 
-    assert (tmp_path / "Movies" / "DolbyTests").is_dir()
+    assert (tmp_path / "Movies" / "AudioTests").is_dir()
     assert not (tmp_path / "Movies" / "Movies").exists()

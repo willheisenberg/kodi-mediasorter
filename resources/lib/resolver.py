@@ -20,8 +20,8 @@ def _woerter(titel):
 def passt_abkuerzung(kuerzel, titel):
     """Laesst sich kuerzel als Kette von Wortanfaengen von titel lesen?
 
-    blarun -> Blade Runner, dar.ma -> Dark Matter, tdk -> The Dark Knight.
-    bsg -> Battlestar Galactica dagegen nicht, das ist eine Silbenabkuerzung.
+    neohar -> Neon Harbor, dee.si -> Deep Signal, tso -> The Silent Order.
+    nbs -> Nebula Station dagegen nicht, das ist eine Silbenabkuerzung.
     """
     rein = re.sub(r"[^a-z0-9]", "", kuerzel.lower())
     if not rein:
@@ -118,8 +118,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-# Der Score allein trennt nicht: House of the Dragon (1.60) gegen die Doku
-# Enter the House of the Dragon (1.33) ist eindeutig, Battlestar Galactica 2003
+# Der Score allein trennt nicht: Palace of the Sun (1.60) gegen die Doku
+# Enter the Palace of the Sun (1.33) ist eindeutig, Nebula Station 2003
 # gegen 1978 (1.18 zu 1.18) nicht. Entscheidend ist Namensgleichheit, nicht der
 # Abstand. Der Faktor dient nur noch als Untergrenze bei verschiedenen Namen.
 MINDESTVORSPRUNG = 1.15
@@ -200,7 +200,7 @@ def tvmaze_per_name(titel, oeffner=None):
         zweiter = daten[1]
         zweiter_name = (zweiter.get("show") or {}).get("name") or ""
 
-        # Echte Ambiguitaet: zwei Serien gleichen Namens, etwa Battlestar
+        # Echte Ambiguitaet: zwei Serien gleichen Namens, etwa Nebula
         # Galactica 2003 und 1978. Kein Score kann das entscheiden.
         if _normal(zweiter_name) == _normal(name):
             log.info("TVmaze mehrdeutig für %r: %s existiert mehrfach" % (titel, name))
@@ -257,12 +257,12 @@ def opensubtitles_per_hash(hashwert, api_key, oeffner=None):
     if not eintraege:
         return None
 
-    details = ((eintraege[0].get("attributes") or {}).get("feature_details") or {})
-    if not details.get("title"):
+    dtls = ((eintraege[0].get("attributes") or {}).get("feature_dtls") or {})
+    if not dtls.get("title"):
         return None
     return {
-        "titel": details["title"],
-        "staffel": details.get("season_number"),
-        "episode": details.get("episode_number"),
-        "typ": "episode" if details.get("feature_type") == "Episode" else "film",
+        "titel": dtls["title"],
+        "staffel": dtls.get("season_number"),
+        "episode": dtls.get("episode_number"),
+        "typ": "episode" if dtls.get("feature_type") == "Episode" else "film",
     }

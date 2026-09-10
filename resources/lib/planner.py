@@ -16,7 +16,7 @@ def season_ordner(nummer):
 def _season_fuer(staffel, episode):
     """Episode 0 kennzeichnet ein Special und landet in Season 00.
 
-    Entspricht dem vorgefundenen Bestand: Battlestar.Galactica.S01E00 liegt
+    Entspricht dem vorgefundenen Bestand: Nebula.Station.S01E00 liegt
     unter Season 00, obwohl der Name Staffel 1 nennt.
     """
     if episode == 0:

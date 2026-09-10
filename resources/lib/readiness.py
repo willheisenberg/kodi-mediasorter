@@ -101,7 +101,7 @@ def ist_temporaer(name):
     """Lage 3: Endung am Namensende deutet auf eine unfertige Datei.
 
     Die Verankerung mit endswith ist wesentlich. Ohne sie wuerde
-    Dune.Part.Two.2024... dauerhaft als unfertig gelten.
+    Example.Part.Two.2024... dauerhaft als unfertig gelten.
     """
     return name.lower().endswith(TEMP_ENDUNGEN)
 

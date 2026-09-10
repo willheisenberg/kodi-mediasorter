@@ -39,8 +39,8 @@ def spielt_gerade(pfad):
         pid = eintrag.get("playerid")
         if pid is None:
             continue
-        details = _rpc("Player.GetItem", {"playerid": pid, "properties": ["file"]})
-        datei = (((details.get("result") or {}).get("item")) or {}).get("file")
+        dtls = _rpc("Player.GetItem", {"playerid": pid, "properties": ["file"]})
+        datei = (((dtls.get("result") or {}).get("item")) or {}).get("file")
         if datei and datei == pfad:
             return True
     return False

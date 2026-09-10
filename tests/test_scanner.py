@@ -6,12 +6,12 @@ def baue_baum(tmp_path):
     (tmp_path / "Serien").mkdir()
     (tmp_path / "Musik").mkdir()
     (tmp_path / ".versteckt").mkdir()
-    (tmp_path / "lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv").write_bytes(b"x")
+    (tmp_path / "example.s01e01.german.dl.1080p.web.h264-group.mkv").write_bytes(b"x")
     (tmp_path / "film.mkv.part").write_bytes(b"x")
     (tmp_path / "notizen.txt").write_bytes(b"x")
-    paket = tmp_path / "Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF"
+    paket = tmp_path / "Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP"
     paket.mkdir()
-    (paket / "reacher.s04e01.mkv").write_bytes(b"x")
+    (paket / "ranger.s04e01.mkv").write_bytes(b"x")
     return tmp_path
 
 
@@ -23,8 +23,8 @@ def test_findet_lose_videodatei_und_ordner(tmp_path):
     baue_baum(tmp_path)
     gefunden = scanner.finde_kandidaten(str(tmp_path), {"Movies", "Serien", "Musik"})
     assert namen(gefunden) == [
-        "Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF",
-        "lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv",
+        "Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP",
+        "example.s01e01.german.dl.1080p.web.h264-group.mkv",
     ]
 
 
@@ -56,8 +56,8 @@ def test_nicht_video_dateien_werden_uebersprungen(tmp_path):
 def test_ordner_markierung_stimmt(tmp_path):
     baue_baum(tmp_path)
     gefunden = {k["name"]: k["ist_ordner"] for k in scanner.finde_kandidaten(str(tmp_path), set())}
-    assert gefunden["Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF"] is True
-    assert gefunden["lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv"] is False
+    assert gefunden["Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP"] is True
+    assert gefunden["example.s01e01.german.dl.1080p.web.h264-group.mkv"] is False
 
 
 def test_fehlender_ordner_liefert_leere_liste(tmp_path):
@@ -81,11 +81,11 @@ def test_ordner_ohne_video_ist_kein_kandidat(tmp_path):
 
 
 def test_ordner_mit_video_in_untertiefe_zaehlt(tmp_path):
-    """Battlestar-Muster: die Videodatei liegt eine Ebene tiefer."""
-    ordner = tmp_path / "Serie.S01E06.German.720p.BluRay.x264-RSG"
+    """Nebula-Muster: die Videodatei liegt eine Ebene tiefer."""
+    ordner = tmp_path / "Serie.S01E06.German.720p.BluRay.x264-NSG"
     (ordner / "Subs").mkdir(parents=True)
     (ordner / "Subs" / "sub.idx").write_bytes(b"x")
-    (ordner / "rsg-serie-s01e06.mkv").write_bytes(b"x")
+    (ordner / "nsg-serie-s01e06.mkv").write_bytes(b"x")
 
     gefunden = scanner.finde_kandidaten(str(tmp_path), set())
 

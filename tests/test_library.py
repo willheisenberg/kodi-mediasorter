@@ -18,11 +18,11 @@ def test_scan_sendet_verzeichnis(lib):
     gesendet = []
     stubs["xbmc"].executeJSONRPC = lambda roh: gesendet.append(roh) or '{"result":"OK"}'
 
-    modul.scanne("/media/MOVIES/Serien/Reacher/Season 04")
+    modul.scanne("/media/MOVIES/Serien/Ranger/Season 04")
 
     anfrage = json.loads(gesendet[0])
     assert anfrage["method"] == "VideoLibrary.Scan"
-    assert anfrage["params"]["directory"] == "/media/MOVIES/Serien/Reacher/Season 04"
+    assert anfrage["params"]["directory"] == "/media/MOVIES/Serien/Ranger/Season 04"
 
 
 def test_spielt_gerade_erkennt_laufende_datei(lib):

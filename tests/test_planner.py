@@ -10,39 +10,39 @@ def test_season_ordner_zweistellig():
 
 
 def test_einzelne_episode_flach(tmp_path):
-    quelle = tmp_path / "lanterns.s01e01.german.dl.1080p.web.h264-wvf.mkv"
+    quelle = tmp_path / "example.s01e01.german.dl.1080p.web.h264-group.mkv"
     quelle.write_bytes(b"x")
     kandidat = {"pfad": str(quelle), "name": quelle.name, "ist_ordner": False}
 
-    plan = planner.plane(kandidat, "Lanterns", "/z/Serien", "/z/Movies")
+    plan = planner.plane(kandidat, "Example", "/z/Serien", "/z/Movies")
 
     assert len(plan) == 1
-    assert plan[0].ziel == os.path.join("/z/Serien", "Lanterns", "Season 01", quelle.name)
+    assert plan[0].ziel == os.path.join("/z/Serien", "Example", "Season 01", quelle.name)
 
 
 def test_ordner_mit_einer_episode_wandert_ganz(tmp_path):
-    ordner = tmp_path / "Battlestar.Galactica.S01E06.Das.Tribunal.German.720p.BluRay.x264-RSG"
+    ordner = tmp_path / "Nebula.Station.S01E06.Das.Tribunal.German.720p.BluRay.x264-NSG"
     ordner.mkdir()
-    (ordner / "rsg-bsg-s01e06-720p.mkv").write_bytes(b"x")
+    (ordner / "nsg-nbs-s01e06-720p.mkv").write_bytes(b"x")
     kandidat = {"pfad": str(ordner), "name": ordner.name, "ist_ordner": True}
 
-    plan = planner.plane(kandidat, "Battlestar Galactica", "/z/Serien", "/z/Movies")
+    plan = planner.plane(kandidat, "Nebula Station", "/z/Serien", "/z/Movies")
 
     assert len(plan) == 1
     assert plan[0].ziel == os.path.join(
-        "/z/Serien", "Battlestar Galactica", "Season 01", ordner.name
+        "/z/Serien", "Nebula Station", "Season 01", ordner.name
     )
 
 
 def test_staffelpaket_wird_aufgebrochen(tmp_path):
-    paket = tmp_path / "Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF"
+    paket = tmp_path / "Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP"
     paket.mkdir()
     for nr in (1, 2, 3):
-        (paket / ("reacher.s04e0%d.german.dl.1080p.web.h264-wayne.mkv" % nr)).write_bytes(b"x")
+        (paket / ("ranger.s04e0%d.german.dl.1080p.web.h264-crew.mkv" % nr)).write_bytes(b"x")
     (paket / "release.nfo").write_bytes(b"x")
     kandidat = {"pfad": str(paket), "name": paket.name, "ist_ordner": True}
 
-    plan = planner.plane(kandidat, "Reacher", "/z/Serien", "/z/Movies")
+    plan = planner.plane(kandidat, "Ranger", "/z/Serien", "/z/Movies")
 
     assert len(plan) == 3, "nur die Videodateien, nicht die NFO"
     for eintrag in plan:
@@ -50,24 +50,24 @@ def test_staffelpaket_wird_aufgebrochen(tmp_path):
 
 
 def test_staffelpaket_nimmt_untertitel_mit(tmp_path):
-    paket = tmp_path / "Reacher.S04.COMPLETE.German.DL.1080p.WEB.h264-WvF"
+    paket = tmp_path / "Ranger.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP"
     paket.mkdir()
-    (paket / "reacher.s04e01.mkv").write_bytes(b"x")
-    (paket / "reacher.s04e01.srt").write_bytes(b"x")
-    (paket / "reacher.s04e02.mkv").write_bytes(b"x")
+    (paket / "ranger.s04e01.mkv").write_bytes(b"x")
+    (paket / "ranger.s04e01.srt").write_bytes(b"x")
+    (paket / "ranger.s04e02.mkv").write_bytes(b"x")
     (paket / "werbung.url").write_bytes(b"x")
     kandidat = {"pfad": str(paket), "name": paket.name, "ist_ordner": True}
 
-    plan = planner.plane(kandidat, "Reacher", "/z/Serien", "/z/Movies")
+    plan = planner.plane(kandidat, "Ranger", "/z/Serien", "/z/Movies")
     namen = sorted(os.path.basename(e.quelle) for e in plan)
 
-    assert namen == ["reacher.s04e01.mkv", "reacher.s04e01.srt", "reacher.s04e02.mkv"]
+    assert namen == ["ranger.s04e01.mkv", "ranger.s04e01.srt", "ranger.s04e02.mkv"]
 
 
 def test_filmordner_wandert_ganz(tmp_path):
-    ordner = tmp_path / "Blade.Runner.1982.German.DL.1080p.BluRay.x264-AVG"
+    ordner = tmp_path / "Neon.Harbor.1982.German.DL.1080p.BluRay.x264-AVX"
     ordner.mkdir()
-    (ordner / "Blade.Runner.1982.German.DL.1080p.BluRay.x264.mkv").write_bytes(b"x")
+    (ordner / "Neon.Harbor.1982.German.DL.1080p.BluRay.x264.mkv").write_bytes(b"x")
     kandidat = {"pfad": str(ordner), "name": ordner.name, "ist_ordner": True}
 
     plan = planner.plane(kandidat, None, "/z/Serien", "/z/Movies")
@@ -77,7 +77,7 @@ def test_filmordner_wandert_ganz(tmp_path):
 
 
 def test_film_als_einzeldatei_bekommt_ordner(tmp_path):
-    quelle = tmp_path / "The.Furious.2025.GERMAN.DL.1080p.WEB.H264-MGE.mkv"
+    quelle = tmp_path / "Example.Movie.2025.GERMAN.DL.1080p.WEB.H264-MGX.mkv"
     quelle.write_bytes(b"x")
     kandidat = {"pfad": str(quelle), "name": quelle.name, "ist_ordner": False}
 
@@ -85,7 +85,7 @@ def test_film_als_einzeldatei_bekommt_ordner(tmp_path):
 
     assert len(plan) == 1
     assert plan[0].ziel == os.path.join(
-        "/z/Movies", "The.Furious.2025.GERMAN.DL.1080p.WEB.H264-MGE", quelle.name
+        "/z/Movies", "Example.Movie.2025.GERMAN.DL.1080p.WEB.H264-MGX", quelle.name
     )
 
 
@@ -125,11 +125,11 @@ def test_sample_zaehlt_nicht_als_episode(tmp_path):
 
 
 def test_specials_landen_in_season_00(tmp_path):
-    quelle = tmp_path / "Battlestar.Galactica.S01E00.Pilot.Teil1.German.DL.BD.x264-TVS.mkv"
+    quelle = tmp_path / "Nebula.Station.S01E00.Pilot.Teil1.German.DL.BD.x264-TVS.mkv"
     quelle.write_bytes(b"x")
     kandidat = {"pfad": str(quelle), "name": quelle.name, "ist_ordner": False}
 
-    plan = planner.plane(kandidat, "Battlestar Galactica", "/z/Serien", "/z/Movies")
+    plan = planner.plane(kandidat, "Nebula Station", "/z/Serien", "/z/Movies")
 
     # Im echten Bestand liegt genau diese Datei unter Season 00, nicht Season 01:
     # Episode 0 kennzeichnet ein Special und gewinnt ueber die Staffelnummer.

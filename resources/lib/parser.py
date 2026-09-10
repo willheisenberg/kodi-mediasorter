@@ -17,7 +17,7 @@ _EPISODE_DE = re.compile(r"[sS]taffel[._ -]?(\d{1,2})[._ -]?[fF]olge[._ -]?(\d{1
 
 _JAHR = re.compile(r"(?<![0-9])((?:19|20)\d{2})(?![0-9])")
 
-# Release-Gruppensuffix am Ende, etwa -ETM oder -BluRHD
+# Release-Gruppensuffix am Ende, etwa -STM oder -BHX
 _GRUPPE = re.compile(r"-[A-Za-z0-9]{2,12}$")
 _MARKER = re.compile(
     r"(?i)(?<![a-z0-9])(1080p|720p|2160p|480p|bluray|blu-ray|web-?dl|webrip|web"
@@ -27,7 +27,7 @@ _MARKER = re.compile(
 
 # Ein echter Release-Ordner nennt Quelle, Codec, Auflaesung und Sprache und
 # kommt damit auf mindestens drei verschiedene Marker. Kurznamen wie
-# bhd-blarun-x265 haben nur einen und sind kein Titel.
+# bhx-neohar-x265 haben nur einen und sind kein Titel.
 _MARKER_MINDESTZAHL = 3
 
 
@@ -56,8 +56,8 @@ def _ohne_endung(name):
 def _erscheinungsjahr(name):
     """Letztes plausibles Jahr im Namen.
 
-    Blade.Runner.2049.2017 liefert 2017, weil 2049 in der Zukunft liegt und
-    damit zum Titel gehoert. 2001.Odyssee.im.Weltraum.1968 liefert 1968, weil
+    Neon.Harbor.2049.2017 liefert 2017, weil 2049 in der Zukunft liegt und
+    damit zum Titel gehoert. 1999.Reise.zum.Mond.1972 liefert 1968, weil
     das letzte plausible Jahr gewinnt.
     """
     grenze = datetime.date.today().year + 1
