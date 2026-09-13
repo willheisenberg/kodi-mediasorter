@@ -47,6 +47,11 @@ def ist_video(name):
     return name.lower().endswith(VIDEO_ENDUNGEN)
 
 
+def ist_sample(name):
+    """Sample als eigenes Token im Dateinamen (keine Groessenheuristik)."""
+    return bool(re.search(r"(?:^|[._ -])sample(?:$|[._ -])", basisname(name), re.I))
+
+
 def _normalisiere(text):
     """Trennzeichen zu Leerzeichen, mehrfache Leerzeichen zusammenziehen."""
     text = re.sub(r"[._]+", " ", text)

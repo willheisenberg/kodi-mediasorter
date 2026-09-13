@@ -2,6 +2,101 @@ import os
 
 import config
 import durchlauf
+import mover
+import pytest
+
+
+def test_filmordner_prueft_alle_dateien_im_selben_takt(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = tmp_path / "Blow.2001"
+    ordner.mkdir()
+    for name in ("film.mkv", "film.nfo", "folder.jpg", "sample.mkv"):
+        (ordner / name).write_bytes(b"fertig")
+    assert durchlauf.einmal(cfg, zustand)["verschoben"] == 0
+    assert durchlauf.einmal(cfg, zustand)["verschoben"] == 1
+    assert len(list((tmp_path / "Movies" / ordner.name).iterdir())) == 4
+
+
+def test_filmordner_behaelt_alle_beigaben(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = tmp_path / "Blow.2001"
+    dateien = {"film.mkv": b"video", "folder.jpg": b"bild", "release.nfo": b"nfo",
+               "Sample/sample.mkv": b"sample", "Subs/de.srt": b"untertitel"}
+    for name, daten in dateien.items():
+        pfad = ordner / name
+        pfad.parent.mkdir(parents=True, exist_ok=True)
+        pfad.write_bytes(daten)
+    stabil_machen(cfg, zustand, takte=12)
+    assert not ordner.exists()
+    for name, daten in dateien.items():
+        assert (tmp_path / "Movies" / ordner.name / name).read_bytes() == daten
+
+
+def test_loser_film_wartet_auf_wachsende_begleitdatei(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    video = tmp_path / "Blow.2001.mkv"
+    nfo = tmp_path / "Blow.2001.nfo"
+    video.write_bytes(b"video")
+    nfo.write_bytes(b"nfo")
+    for i in range(5):
+        nfo.write_bytes(b"nfo" * (i + 1))
+        durchlauf.einmal(cfg, zustand)
+        assert video.exists()
+        assert nfo.exists()
+    stabil_machen(cfg, zustand, takte=5)
+    ziel = tmp_path / "Movies" / "Blow.2001"
+    assert (ziel / video.name).read_bytes() == b"video"
+    assert (ziel / nfo.name).read_bytes() == b"nfo" * 5
+
+
+def test_temporaere_begleitdatei_blockiert_film(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Blow.2001.mkv").write_bytes(b"video")
+    nfo = tmp_path / "Blow.2001.nfo.part"
+    nfo.write_bytes(b"nfo")
+    stabil_machen(cfg, zustand, takte=6)
+    assert (tmp_path / "Blow.2001.mkv").exists()
+    nfo.rename(tmp_path / "Blow.2001.nfo")
+    stabil_machen(cfg, zustand, takte=5)
+    assert (tmp_path / "Movies" / "Blow.2001" / "Blow.2001.nfo").exists()
+
+
+@pytest.mark.parametrize("konflikt", ["Blow.2001.mkv", "Blow.2001.nfo"])
+def test_kollision_verschiebt_keinen_teil_des_films(tmp_path, konflikt):
+    cfg, zustand = baue_umgebung(tmp_path)
+    for name in ("Blow.2001.mkv", "Blow.2001.nfo"):
+        (tmp_path / name).write_bytes(b"neu")
+    ziel = tmp_path / "Movies" / "Blow.2001"
+    ziel.mkdir()
+    (ziel / konflikt).write_bytes(b"alt")
+    stabil_machen(cfg, zustand, takte=5)
+    assert (tmp_path / "Blow.2001.mkv").read_bytes() == b"neu"
+    assert (tmp_path / "Blow.2001.nfo").read_bytes() == b"neu"
+    assert (ziel / konflikt).read_bytes() == b"alt"
+    assert len(list(ziel.iterdir())) == 1
+    assert zustand.warteschlange.anzahl() == 1
+
+
+def test_begleiterfehler_bleibt_wiederholbar(tmp_path, monkeypatch):
+    cfg, zustand = baue_umgebung(tmp_path)
+    for name in ("Blow.2001.mkv", "Blow.2001.jpg", "Blow.2001.nfo"):
+        (tmp_path / name).write_bytes(b"daten")
+    original = mover.verschiebe
+
+    def mit_fehler(schritt, *args):
+        if schritt.quelle.endswith(".nfo"):
+            return mover.FEHLER
+        return original(schritt, *args)
+
+    monkeypatch.setattr(mover, "verschiebe", mit_fehler)
+    stabil_machen(cfg, zustand, takte=6)
+    assert (tmp_path / "Blow.2001.mkv").exists()
+    assert (tmp_path / "Blow.2001.nfo").exists()
+    monkeypatch.setattr(mover, "verschiebe", original)
+    stabil_machen(cfg, zustand, takte=5)
+    ziel = tmp_path / "Movies" / "Blow.2001"
+    assert {p.name for p in ziel.iterdir()} == {"Blow.2001.mkv", "Blow.2001.jpg", "Blow.2001.nfo"}
+    assert zustand.warteschlange.anzahl() == 0
 
 
 def baue_umgebung(tmp_path, dry_run=False):

@@ -40,7 +40,7 @@ def finde_kandidaten(watch_path, ignoriert):
         if ist_ordner:
             if not _enthaelt_video(pfad):
                 continue
-        elif not parser.ist_video(name):
+        elif not parser.ist_video(name) or parser.ist_sample(name):
             continue
 
         kandidaten.append({"pfad": pfad, "name": name, "ist_ordner": ist_ordner})

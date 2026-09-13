@@ -1,6 +1,33 @@
 import os
 
 import planner
+import pytest
+
+
+def test_loser_film_nimmt_nur_eindeutige_begleiter_mit(tmp_path):
+    for name in ("Blow.2001.mkv", "Blow.2001.nfo", "Blow.2001.de.srt",
+                 "Blow.2001-poster.jpg", "Blow.20010.nfo", "folder.jpg",
+                 "Anderer.Film.nfo", "Blow.2001.nfo.part"):
+        (tmp_path / name).write_bytes(b"x")
+    (tmp_path / "Blow.2001.png").mkdir()
+    quelle = tmp_path / "Blow.2001.mkv"
+    plan = planner.plane(
+        {"pfad": str(quelle), "name": quelle.name, "ist_ordner": False},
+        None, "/z/Serien", "/z/Movies",
+    )
+    assert {os.path.basename(s.quelle) for s in plan} == {
+        "Blow.2001.mkv", "Blow.2001.nfo", "Blow.2001.de.srt", "Blow.2001-poster.jpg",
+    }
+    assert all(os.path.dirname(s.ziel) == "/z/Movies/Blow.2001" for s in plan)
+    assert plan[-1].quelle == str(quelle)
+
+
+@pytest.mark.parametrize("anderes_video", ["Film.Extended.mkv", "Film.mp4"])
+def test_mehrdeutige_begleiter_bleiben_liegen(tmp_path, anderes_video):
+    for name in ("Film.mkv", anderes_video, "Film.Extended.nfo"):
+        (tmp_path / name).write_bytes(b"x")
+    assert planner.film_begleiter(str(tmp_path / "Film.mkv")) == []
+    assert planner.film_begleiter(str(tmp_path / anderes_video)) == []
 
 
 def test_season_ordner_zweistellig():

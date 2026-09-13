@@ -214,3 +214,22 @@ def test_zusammengeschrieben_fragt_nicht_bei_kurzen_oder_getrennten_titeln():
     assert resolver.tvmaze_zusammengeschrieben("night signal", oeffnen) is None
     assert resolver.tvmaze_zusammengeschrieben("xyz", oeffnen) is None
     assert aufrufe == []
+
+
+def test_serien_vorschlaege_listen_alle_ids_mit_unterscheidbaren_zielen():
+    daten = [
+        {'show': {'id': 1, 'name': 'Example', 'premiered': '2020-01-01',
+                  'network': {'name': 'Sender A', 'country': {'name': 'Germany'}}}},
+        {'show': {'id': 2, 'name': 'Example', 'premiered': '2023-01-01',
+                  'webChannel': {'name': 'Sender B'}}},
+        {'show': {'id': 3, 'name': 'Example Documentary', 'premiered': None}},
+    ]
+    result = resolver.serien_vorschlaege('example', [], oeffner_mit(daten))
+    assert [r['ziel'] for r in result] == ['Example (2020)', 'Example (2023)', 'Example Documentary']
+    assert 'Germany' in result[0]['beschreibung']
+    assert 'https://www.tvmaze.com/shows/2' in result[1]['beschreibung']
+
+
+def test_serien_vorschlaege_behalten_lokale_treffer_bei_netzfehler():
+    result = resolver.serien_vorschlaege('ns', ['Night Signal', 'Nebula Station'], oeffner_404())
+    assert {r['ziel'] for r in result} == {'Night Signal', 'Nebula Station'}

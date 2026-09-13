@@ -13,6 +13,7 @@ import planner
 import readiness
 import resolver
 import scanner
+import zuordnung
 
 
 # Wie lange ein fehlgeschlagener Online-Lookup ruht. Ohne diese Sperre fragte
@@ -30,6 +31,7 @@ class Zustand:
             os.path.join(datenordner, "queue.json")
         )
         self.protokoll = os.path.join(datenordner, "moves.log")
+        self.zuordnungen = zuordnung.Zuordnungen(cfg.watch_path, datenordner)
         # Nur im Speicher: ein Neustart des Dienstes hebt alle Sperren auf.
         self.uhr = time.time
         self._sperre = {}
@@ -44,7 +46,10 @@ class Zustand:
 
 def _dateien_von(kandidat):
     if not kandidat["ist_ordner"]:
-        return [kandidat["pfad"]]
+        dateien = [kandidat["pfad"]]
+        if parser.parse(kandidat["name"])["typ"] == "film":
+            dateien.extend(planner.film_begleiter(kandidat["pfad"], mit_temporaeren=True))
+        return dateien
     gefunden = []
     for wurzel, _ordner, namen in os.walk(kandidat["pfad"]):
         gefunden.extend(os.path.join(wurzel, n) for n in namen)
@@ -65,14 +70,15 @@ def _ist_fertig(kandidat, cfg, zustand):
     if not dateien:
         return False
 
+    alle_stabil = True
     for datei in dateien:
         if readiness.ist_temporaer(os.path.basename(datei)):
             return False
         if parser.ist_video(datei) and readiness.ist_vollstaendig(datei) is False:
             return False
         if not zustand.stabilitaet.pruefe(datei):
-            return False
-    return True
+            alle_stabil = False
+    return alle_stabil
 
 
 def _wird_abgespielt(kandidat, spielt_gerade):
@@ -111,6 +117,12 @@ def loese_titel(kandidat, cfg, zustand):
             if s:
                 zustand.cache.setze(s, wert)
         return wert
+
+    # Manuelle Entscheidungen gelten sofort, auch waehrend der Online-Sperre.
+    for k in kandidaten:
+        if zustand.zuordnungen.bekannt(k):
+            auswahl = zustand.zuordnungen.auswahl(k)
+            return merke(auswahl, haupttitel, k) if auswahl else None
 
     # Stufe 2: Cache
     for k in kandidaten:
@@ -162,6 +174,10 @@ def loese_titel(kandidat, cfg, zustand):
                 return merke(daten["titel"], haupttitel or hashwert)
         zustand.sperren("hash:" + pfad)
 
+    if haupttitel and not zustand.gesperrt("auswahl:" + haupttitel):
+        vorschlaege = resolver.serien_vorschlaege(haupttitel, vorhandene)
+        zustand.zuordnungen.vorschlagen(haupttitel, name, vorschlaege)
+        zustand.sperren("auswahl:" + haupttitel)
     return None
 
 
@@ -210,6 +226,11 @@ def einmal(cfg, zustand, spielt_gerade=None):
             continue
 
         offen = False
+        # Keine Begleitdateien zu einem bereits vorhandenen anderen Film legen.
+        if any(os.path.lexists(schritt.ziel) for schritt in plan):
+            zustand.warteschlange.eintragen(kandidat["pfad"], "Ziel existiert bereits")
+            zaehler["wartend"] += 1
+            continue
         for schritt in plan:
             ergebnis = mover.verschiebe(schritt, cfg.dry_run, zustand.protokoll)
             if ergebnis == mover.ERFOLG:
@@ -218,6 +239,7 @@ def einmal(cfg, zustand, spielt_gerade=None):
                 zustand.stabilitaet.vergiss(schritt.quelle)
             elif ergebnis in (mover.KOLLISION, mover.FEHLER):
                 offen = True
+                break
 
         if offen:
             zustand.warteschlange.eintragen(
@@ -226,10 +248,13 @@ def einmal(cfg, zustand, spielt_gerade=None):
             zaehler["wartend"] += 1
         else:
             zustand.warteschlange.entfernen(kandidat["pfad"])
+            if not cfg.dry_run and titel:
+                zustand.zuordnungen.erledigt(titel)
             if kandidat["ist_ordner"] and not cfg.dry_run:
                 mover.raeume_leeren_ordner(kandidat["pfad"], cfg.dry_run)
 
     zustand.cache.speichere()
+    zustand.zuordnungen.aufraeumen()
     zustand.warteschlange.speichere()
     log.info(
         "Takt beendet: %d verschoben, %d wartend, %d übersprungen"

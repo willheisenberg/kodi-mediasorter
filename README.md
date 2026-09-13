@@ -23,6 +23,28 @@ Example.Show.S04.COMPLETE.German.DL.1080p.WEB.h264-GROUP/
 
 Nothing is ever renamed, and nothing is ever overwritten.
 
+## Keeping movies and extras together
+
+Configure JDownloader's **Archive Extractor** to create a subfolder using
+`%PACKAGENAME%` (`subpathenabled: true`). With the extraction path set to
+`/output`, a flat archive with multiple files is extracted into its package
+folder. The sorter moves that whole folder, including NFOs, `folder.jpg`,
+subtitles, samples and nested extras, once its files pass the readiness checks.
+Keep the default threshold of two files/folders to avoid adding another wrapper
+when the archive already contains a single release folder.
+
+For movies arriving as loose video files, the sorter also takes matching NFOs,
+subtitles and artwork (`.jpg`, `.jpeg`, `.png`, `.webp`, `.tbn`). Names must match
+the video basename, optionally followed by a separator and a suffix, for example
+`Film.2001.nfo`, `Film.2001.de.srt` or `Film.2001-poster.jpg`. Ambiguous matches
+and generic loose names such as `folder.jpg` stay in place. Existing orphaned
+extras whose video has already moved need manual assignment.
+
+Matching extras must finish writing before the movie moves. A destination
+collision holds the entire plan; if an individual move fails, processing stops
+and the video remains available for retry. Loose videos containing `sample` as
+a separate filename token are skipped; no minimum video size is imposed.
+
 ## It knows when a file is still being unpacked
 
 The hard part is not moving files, it is knowing when one is finished. While a
@@ -100,6 +122,31 @@ companion documentary with a longer name, can.
 
 ## The queue clears itself
 
+### Choose a series without the Kodi UI
+
+If automatic lookup cannot decide and finds possible series, the add-on creates
+`Mediasorter-Zuordnung.txt` in the watched folder (beside `Movies` and `Serien`).
+Open it over the file share, replace exactly one `[ ]` with `[x]` in the relevant
+series section, and save. Leave the IDs and section markers unchanged.
+
+Each option includes the title, premiere year, broadcaster/country where known,
+a TVmaze link, and its destination folder. Shows sharing a title receive distinct
+destinations using the year. Existing matching library folders are offered too.
+The list contains the search results, which may include less relevant matches.
+
+The next tick reads the selection even during the six-hour online lookup pause.
+The regular readiness, playback and collision checks still apply. Subsequent
+episodes with the same search name use the same choice, including after restart.
+With no selection or multiple checked options, files stay queued. If a search
+has no results or the network is unavailable, it is retried later.
+
+After a successful move, the completed section is removed. If no questions
+remain, `Mediasorter-Zuordnung.txt` is deleted automatically. Pending sections
+and their checkmarks are preserved. Failed moves, collisions and dry runs keep
+the selection available. Confirmed assignments remain in `zuordnungen.json` in
+the add-on profile, so subsequent episodes need no new selection. Editing option
+descriptions or paths in the text does not change the proposed destinations.
+
 Anything that cannot be placed stays put and is reassessed on every tick. When
 a later episode arrives with a full name, the show folder appears — and the
 previously unreadable short name finds it through stage 3 and gets filed after
@@ -171,7 +218,7 @@ so any step can be undone by hand.
 ## Development
 
 ```bash
-python3 -m pytest          # 188 tests, all offline
+python3 -m pytest          # offline tests
 ```
 
 The suite blocks HTTP calls globally; tests that genuinely need the network

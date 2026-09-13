@@ -1,4 +1,22 @@
 import scanner
+import pytest
+
+
+@pytest.mark.parametrize("name", ["sample.mkv", "Film.2001-SAMPLE.mp4", "film_sample.avi"])
+def test_lose_samples_werden_nicht_als_filme_einsortiert(tmp_path, name):
+    (tmp_path / name).write_bytes(b"x")
+    assert scanner.finde_kandidaten(str(tmp_path), set()) == []
+
+
+def test_sample_im_filmordner_verhindert_nicht_dessen_mitnahme(tmp_path):
+    ordner = tmp_path / "Film.2001"
+    ordner.mkdir()
+    (ordner / "sample.mkv").write_bytes(b"x")
+    (ordner / "film.mkv").write_bytes(b"x")
+    (tmp_path / "Resampled.2001.mkv").write_bytes(b"x")
+    assert namen(scanner.finde_kandidaten(str(tmp_path), set())) == [
+        "Film.2001", "Resampled.2001.mkv",
+    ]
 
 
 def baue_baum(tmp_path):

@@ -225,6 +225,38 @@ def tvmaze_per_name(titel, oeffner=None):
     return name
 
 
+def serien_vorschlaege(titel, vorhandene, oeffner=None):
+    """Alle Suchtreffer mit Jahr, Sender/Land und stabiler ID fuer die Auswahl."""
+    vorschlaege = [{"id": "ordner:" + n, "ziel": n,
+                    "beschreibung": n + " (vorhandener Serienordner)"}
+                   for n in vorhandene if passt_abkuerzung(titel, n)]
+    url = "https://api.tvmaze.com/search/shows?q=" + urllib.parse.quote(titel)
+    daten = _json_von(oeffner, url)
+    shows = {}
+    for eintrag in daten if isinstance(daten, list) else []:
+        show = eintrag.get("show") or {}
+        if isinstance(show.get("id"), int) and show.get("name"):
+            shows[show["id"]] = show
+    for sid, show in shows.items():
+        name = show["name"]
+        jahr = (show.get("premiered") or "")[:4]
+        sender = show.get("network") or show.get("webChannel") or {}
+        land = (sender.get("country") or {}).get("name") or ""
+        doppelt = sum(_normal(s["name"]) == _normal(name) for s in shows.values()) > 1
+        ziel = "%s (%s)" % (name, jahr or sid) if doppelt else name
+        if doppelt and sum(s["name"] == name and (s.get("premiered") or "")[:4] == jahr
+                           for s in shows.values()) > 1:
+            ziel += " [TVmaze %s]" % sid
+        vorschlaege.append({
+            "id": "tvmaze:%s" % sid, "ziel": ziel,
+            "beschreibung": " | ".join(str(s) for s in (
+                name, jahr or "Startjahr unbekannt", sender.get("name"), land,
+                show.get("language"), "https://www.tvmaze.com/shows/%s" % sid,
+            ) if s),
+        })
+    return vorschlaege
+
+
 def opensubtitles_hash(pfad):
     """64-Bit-Hash aus Dateigroesse sowie den ersten und letzten 64 KB."""
     block = 65536

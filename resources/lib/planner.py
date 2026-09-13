@@ -3,10 +3,42 @@ import collections
 import os
 
 import parser
+import readiness
 
 Verschiebung = collections.namedtuple("Verschiebung", "quelle ziel grund")
 
 UNTERTITEL_ENDUNGEN = (".srt", ".sub", ".idx", ".sup", ".ass", ".ssa")
+FILM_BEGLEITER_ENDUNGEN = UNTERTITEL_ENDUNGEN + (".nfo", ".jpg", ".jpeg", ".png", ".webp", ".tbn")
+
+
+def film_begleiter(pfad, mit_temporaeren=False):
+    """Lose Begleitdateien nur bei eindeutiger Zuordnung zum Videobasisnamen."""
+    ordner = os.path.dirname(pfad)
+    try:
+        namen = sorted(os.listdir(ordner))
+    except OSError:
+        return []
+    videos = [n for n in namen if parser.ist_video(n)
+              and not parser.ist_sample(n) and os.path.isfile(os.path.join(ordner, n))]
+    treffer = []
+    for name in namen:
+        pruefname = name
+        if mit_temporaeren and readiness.ist_temporaer(name):
+            pruefname = parser.basisname(name)
+        if not pruefname.lower().endswith(FILM_BEGLEITER_ENDUNGEN):
+            continue
+        if not os.path.isfile(os.path.join(ordner, name)):
+            continue
+        basis = parser.basisname(pruefname).lower()
+        passend = []
+        for video in videos:
+            videobasis = parser.basisname(video).lower()
+            if basis == videobasis or basis.startswith(tuple(
+                    videobasis + trenner for trenner in (".", "-", "_", " "))):
+                passend.append(video)
+        if passend == [os.path.basename(pfad)]:
+            treffer.append(os.path.join(ordner, name))
+    return treffer
 
 
 def season_ordner(nummer):
@@ -117,6 +149,12 @@ def plane(kandidat, titel, ziel_serien, ziel_filme):
         )]
 
     ordnername = parser.basisname(name)
-    return [Verschiebung(
+    # Video zuletzt: bei einem Fehler bleiben die restlichen Begleiter im
+    # naechsten Takt ueber den Videokandidaten erneut erreichbar.
+    plan = [Verschiebung(
+        begleiter, os.path.join(ziel_filme, ordnername, os.path.basename(begleiter)),
+        "Begleitdatei zum Film",
+    ) for begleiter in film_begleiter(pfad)]
+    return plan + [Verschiebung(
         pfad, os.path.join(ziel_filme, ordnername, name), "Film als Einzeldatei"
     )]
