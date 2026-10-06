@@ -442,3 +442,106 @@ def test_scanziel_bei_film_als_einzeldatei_ist_der_neue_ordner(tmp_path):
         alle |= durchlauf.einmal(cfg, zustand)["zielpfade"]
 
     assert alle == {str(tmp_path / "Movies" / "Example.Movie.2025.GERMAN.DL.1080p.WEB.H264-MGX")}
+
+
+def test_film_wird_als_hinzugefuegt_gemeldet(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Blow.2001.German.1080p.BluRay.x264-GRP.mkv").write_bytes(b"x" * 100)
+    (tmp_path / "Blow.2001.German.1080p.BluRay.x264-GRP.nfo").write_bytes(b"nfo")
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    assert gemeldet == [{"typ": "film", "titel": "Blow (2001)"}]
+
+
+def test_episode_wird_mit_aufgeloestem_titel_gemeldet(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Serien" / "Nebula Station").mkdir()
+    (tmp_path / "nebulastation.s04e08.german.dl.1080p.web.h264-crew.mkv").write_bytes(b"x")
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    assert gemeldet == [
+        {"typ": "serie", "titel": "Nebula Station", "staffel": 4, "episoden": [8]}
+    ]
+
+
+def test_staffelpaket_ergibt_eine_meldung_pro_staffel(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Serien" / "Ranger").mkdir()
+    ordner = tmp_path / "Ranger.S04.COMPLETE.German.1080p.WEB.h264-CREW"
+    ordner.mkdir()
+    for name in ("ranger.s04e01.mkv", "ranger.s04e02.mkv", "ranger.s04e02.srt",
+                 "ranger.s05e01.mkv"):
+        (ordner / name).write_bytes(b"x")
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    assert gemeldet == [
+        {"typ": "serie", "titel": "Ranger", "staffel": 4, "episoden": [1, 2]},
+        {"typ": "serie", "titel": "Ranger", "staffel": 5, "episoden": [1]},
+    ]
+
+
+def test_trockenlauf_meldet_nichts(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path, dry_run=True)
+    (tmp_path / "Blow.2001.mkv").write_bytes(b"x")
+    for _ in range(4):
+        assert durchlauf.einmal(cfg, zustand)["hinzugefuegt"] == []
+
+
+def test_kollision_meldet_nichts(tmp_path):
+    cfg, zustand = baue_umgebung(tmp_path)
+    (tmp_path / "Blow.2001.mkv").write_bytes(b"neu")
+    ziel = tmp_path / "Movies" / "Blow.2001"
+    ziel.mkdir()
+    (ziel / "Blow.2001.mkv").write_bytes(b"alt")
+    for _ in range(4):
+        assert durchlauf.einmal(cfg, zustand)["hinzugefuegt"] == []
+
+
+def test_nichtssagender_filmname_wird_per_inhalt_aufgeloest(tmp_path, monkeypatch):
+    cfg, zustand = baue_umgebung(tmp_path)
+    cfg.opensubtitles_api_key = "key"
+    cfg.telegram_enabled = True
+    cfg.telegram_token = "123:abc"
+    cfg.telegram_chat_id = "-100"
+    (tmp_path / "bhx-neohar-x265.mkv").write_bytes(b"x")
+    gesehen = []
+
+    def per_hash(hashwert, api_key, oeffner=None):
+        gesehen.append((hashwert, api_key))
+        return {"titel": "Neon Harbor", "staffel": None, "episode": None, "typ": "film"}
+
+    monkeypatch.setattr(durchlauf.resolver, "opensubtitles_hash", lambda pfad: "abc123")
+    monkeypatch.setattr(durchlauf.resolver, "opensubtitles_per_hash", per_hash)
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    assert gemeldet == [{"typ": "film", "titel": "Neon Harbor"}]
+    assert gesehen == [("abc123", "key")]
+
+
+def test_ohne_telegram_kein_inhaltsabruf_fuer_filme(tmp_path, monkeypatch):
+    cfg, zustand = baue_umgebung(tmp_path)
+    cfg.opensubtitles_api_key = "key"
+    (tmp_path / "bhx-neohar-x265.mkv").write_bytes(b"x")
+
+    def verboten(*a, **kw):
+        raise AssertionError("kein Abruf ohne Telegram")
+
+    monkeypatch.setattr(durchlauf.resolver, "opensubtitles_per_hash", verboten)
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    assert gemeldet == [{"typ": "film", "titel": "bhx-neohar"}]

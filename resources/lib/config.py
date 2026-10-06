@@ -9,10 +9,11 @@ import log
 
 SCHLUESSEL_TEXT = (
     "watch_path", "series_path", "movies_path", "ignore_list",
-    "opensubtitles_api_key",
+    "opensubtitles_api_key", "telegram_token", "telegram_chat_id",
+    "telegram_text_film", "telegram_text_serie",
 )
 SCHLUESSEL_ZAHL = ("interval_seconds", "stability_cycles", "rar_quiet_seconds")
-SCHLUESSEL_JA_NEIN = ("dry_run", "notify", "library_scan")
+SCHLUESSEL_JA_NEIN = ("dry_run", "notify", "library_scan", "telegram_enabled")
 
 
 class Config:
@@ -30,6 +31,11 @@ class Config:
         self.notify = bool(werte["notify"])
         self.library_scan = bool(werte["library_scan"])
         self.opensubtitles_api_key = (werte.get("opensubtitles_api_key") or "").strip()
+        self.telegram_enabled = bool(werte.get("telegram_enabled"))
+        self.telegram_token = (werte.get("telegram_token") or "").strip()
+        self.telegram_chat_id = (werte.get("telegram_chat_id") or "").strip()
+        self.telegram_text_film = (werte.get("telegram_text_film") or "").strip()
+        self.telegram_text_serie = (werte.get("telegram_text_serie") or "").strip()
 
     @classmethod
     def aus_dict(cls, werte):
@@ -48,6 +54,11 @@ class Config:
         for k in SCHLUESSEL_JA_NEIN:
             werte[k] = addon.getSettingBool(k)
         return cls(werte)
+
+    def telegram_aktiv(self):
+        return bool(
+            self.telegram_enabled and self.telegram_token and self.telegram_chat_id
+        )
 
     def _absolut(self, pfad):
         if os.path.isabs(pfad):

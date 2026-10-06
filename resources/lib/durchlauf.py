@@ -195,6 +195,66 @@ def _scanziel(ziel, cfg):
     return os.path.dirname(ziel)
 
 
+def _episoden_von(kandidat):
+    """Sortierte (staffel, episode)-Paare des Kandidaten. Leer bei Filmen."""
+    if kandidat["ist_ordner"]:
+        episoden = planner.episoden_im_ordner(kandidat["pfad"])
+        if episoden:
+            return sorted(episoden)
+    info = parser.parse(kandidat["name"])
+    if info["typ"] == "episode":
+        return [(info["staffel"], info["episode"])]
+    return []
+
+
+def _filmvideo(pfad):
+    """Die Filmdatei selbst oder das groesste Video im Filmordner."""
+    if not os.path.isdir(pfad):
+        return pfad
+    videos = []
+    for wurzel, _ordner, namen in os.walk(pfad):
+        for name in namen:
+            if parser.ist_video(name) and not parser.ist_sample(name):
+                videos.append(os.path.join(wurzel, name))
+    try:
+        return max(videos, key=os.path.getsize) if videos else None
+    except OSError:
+        return None
+
+
+def _filmtitel(name, ziel, cfg):
+    """Titel fuer die Meldung. ziel ist der Ort nach dem Verschieben.
+
+    Ein sprechender Name traegt den Titel schon in sich. Bei allem anderen
+    hilft nur der Inhalt, also dieselbe Hash-Suche wie in Stufe 5. Sie laeuft
+    nur, wenn die Meldung auch jemand liest, und nur einmal: der Film ist
+    verschoben und kommt in keinem spaeteren Takt wieder vorbei.
+    """
+    if (not parser.ist_sprechend(name) and cfg.opensubtitles_api_key
+            and cfg.telegram_aktiv()):
+        video = _filmvideo(ziel)
+        hashwert = resolver.opensubtitles_hash(video) if video else None
+        if hashwert:
+            daten = resolver.opensubtitles_per_hash(hashwert, cfg.opensubtitles_api_key)
+            if daten and daten.get("titel"):
+                return daten["titel"]
+    return parser.anzeigetitel(name)
+
+
+def _meldungen(kandidat, titel, episoden, filmziel, cfg):
+    """Eintraege fuer zaehler["hinzugefuegt"]: ein Film oder je Staffel eine Serie."""
+    if not (titel and episoden):
+        return [{"typ": "film",
+                 "titel": _filmtitel(kandidat["name"], filmziel, cfg)}]
+    je_staffel = {}
+    for staffel, episode in episoden:
+        je_staffel.setdefault(staffel, []).append(episode)
+    return [
+        {"typ": "serie", "titel": titel, "staffel": staffel, "episoden": nummern}
+        for staffel, nummern in sorted(je_staffel.items())
+    ]
+
+
 def einmal(cfg, zustand, spielt_gerade=None):
     """Ein vollstaendiger Takt.
 
@@ -202,7 +262,8 @@ def einmal(cfg, zustand, spielt_gerade=None):
     library.spielt_gerade durch; in Tests bleibt sie None. So wird die
     Player-Pruefung erfuellt, ohne dass durchlauf.py Kodi importiert.
     """
-    zaehler = {"verschoben": 0, "wartend": 0, "uebersprungen": 0, "zielpfade": set()}
+    zaehler = {"verschoben": 0, "wartend": 0, "uebersprungen": 0, "zielpfade": set(),
+               "hinzugefuegt": []}
 
     zustand.warteschlange.aufraeumen()
     kandidaten = scanner.finde_kandidaten(cfg.watch_path, cfg.ignoriert())
@@ -226,6 +287,7 @@ def einmal(cfg, zustand, spielt_gerade=None):
             continue
 
         offen = False
+        episoden = _episoden_von(kandidat)     # vor dem Verschieben lesen
         # Keine Begleitdateien zu einem bereits vorhandenen anderen Film legen.
         if any(os.path.lexists(schritt.ziel) for schritt in plan):
             zustand.warteschlange.eintragen(kandidat["pfad"], "Ziel existiert bereits")
@@ -250,6 +312,10 @@ def einmal(cfg, zustand, spielt_gerade=None):
             zustand.warteschlange.entfernen(kandidat["pfad"])
             if not cfg.dry_run and titel:
                 zustand.zuordnungen.erledigt(titel)
+            if not cfg.dry_run:
+                zaehler["hinzugefuegt"].extend(
+                    _meldungen(kandidat, titel, episoden, plan[-1].ziel, cfg)
+                )
             if kandidat["ist_ordner"] and not cfg.dry_run:
                 mover.raeume_leeren_ordner(kandidat["pfad"], cfg.dry_run)
 

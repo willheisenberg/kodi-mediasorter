@@ -175,3 +175,17 @@ def test_titel_kandidaten_punktschema_wird_nicht_gekuerzt():
 
 def test_titel_kandidaten_ohne_titel_leer():
     assert parser.titel_kandidaten("1080p-s01e01.mkv") == []
+
+
+@pytest.mark.parametrize("name, erwartet", [
+    ("Blow.2001.German.DL.1080p.BluRay.x264-GRP.mkv", "Blow (2001)"),
+    ("Neon.Harbor.2049.2017.German.1080p.BluRay.x264-AVX", "Neon Harbor 2049 (2017)"),
+    ("Blow (2001)", "Blow (2001)"),
+    ("The_Silent_Order.German.DL.1080p.BluRay.x264-GRP.mkv", "The Silent Order"),
+    ("Urlaubsvideo.mkv", "Urlaubsvideo"),
+    ("Spider-Man.Brand.New.Day.2026.German.DL.1080p.WEB.h264-WvF",
+     "Spider-Man Brand New Day (2026)"),
+    ("Blow - 2001 - 1080p.mkv", "Blow (2001)"),
+])
+def test_anzeigetitel_behaelt_schreibweise_und_nennt_das_jahr(name, erwartet):
+    assert parser.anzeigetitel(name) == erwartet

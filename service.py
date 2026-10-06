@@ -18,6 +18,7 @@ import config          # noqa: E402
 import durchlauf       # noqa: E402
 import library         # noqa: E402
 import log             # noqa: E402
+import telegram        # noqa: E402
 
 _KODI_LEVEL = {
     log.DEBUG: xbmc.LOGDEBUG,
@@ -70,6 +71,11 @@ def main():
             if cfg.library_scan and not cfg.dry_run:
                 for pfad in sorted(zaehler["zielpfade"]):
                     library.scanne(pfad)
+            if zaehler["hinzugefuegt"]:
+                try:
+                    telegram.melde(cfg, zaehler["hinzugefuegt"])
+                except Exception as ausnahme:   # eine Meldung darf den Dienst nie beenden
+                    log.error("Telegram-Meldung abgebrochen: %s" % type(ausnahme).__name__)
             if cfg.notify and zaehler["verschoben"]:
                 library.benachrichtige(
                     "Media Sorter", "%d Dateien einsortiert" % zaehler["verschoben"]

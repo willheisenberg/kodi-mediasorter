@@ -52,11 +52,15 @@ def ist_sample(name):
     return bool(re.search(r"(?:^|[._ -])sample(?:$|[._ -])", basisname(name), re.I))
 
 
-def _normalisiere(text):
+def _saeubere(text):
     """Trennzeichen zu Leerzeichen, mehrfache Leerzeichen zusammenziehen."""
     text = re.sub(r"[._]+", " ", text)
     text = re.sub(r"\s*-\s*", " ", text)
-    return re.sub(r"\s+", " ", text).strip().lower()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalisiere(text):
+    return _saeubere(text).lower()
 
 
 def _ohne_technik_am_ende(titel):
@@ -150,6 +154,31 @@ def parse(name):
         "episode": None,
         "jahr": None,
     }
+
+
+def _lesbar(text):
+    """Wie _saeubere, aber Bindestriche im Wort bleiben: Spider-Man."""
+    text = re.sub(r"[._]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip(" -([")
+
+
+def anzeigetitel(name):
+    """Lesbarer Filmtitel in der Schreibweise des Namens, mit Jahr in Klammern.
+
+    Blow.2001.German.DL.1080p.BluRay.x264-GRP wird zu Blow (2001). Anders als
+    parse() ist das kein Suchbegriff, sondern Text fuer Menschen.
+    """
+    rumpf = _ohne_endung(name)
+    pos, jahr = _erscheinungsjahr(rumpf)
+    if jahr is not None:
+        titel = _lesbar(rumpf[:pos])
+        if titel:
+            return "%s (%d)" % (titel, jahr)
+
+    rumpf_ohne_gruppe = _GRUPPE.sub("", rumpf)
+    marker = _MARKER.search(rumpf_ohne_gruppe)
+    titel = rumpf_ohne_gruppe[: marker.start()] if marker else rumpf_ohne_gruppe
+    return _lesbar(titel) or _lesbar(rumpf)
 
 
 def titel_kandidaten(name):

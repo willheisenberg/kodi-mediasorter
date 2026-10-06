@@ -120,3 +120,21 @@ def test_externe_ziele_stehen_nicht_in_der_ignorierliste(tmp_path):
     anderswo.mkdir(exist_ok=True)
     c = basis(tmp_path, series_path=str(anderswo))
     assert "extern" not in c.ignoriert()
+
+
+def test_telegram_ist_ohne_angaben_aus(tmp_path):
+    c = basis(tmp_path)
+    assert c.telegram_aktiv() is False
+    assert c.telegram_text_film == ""
+    assert c.telegram_text_serie == ""
+
+
+def test_telegram_braucht_schalter_token_und_chat(tmp_path):
+    voll = {"telegram_enabled": True, "telegram_token": " 123:abc ",
+            "telegram_chat_id": " -100 "}
+    c = basis(tmp_path, **voll)
+    assert c.telegram_aktiv() is True
+    assert c.telegram_token == "123:abc"
+    assert c.telegram_chat_id == "-100"
+    for fehlt in voll:
+        assert basis(tmp_path, **dict(voll, **{fehlt: ""})).telegram_aktiv() is False

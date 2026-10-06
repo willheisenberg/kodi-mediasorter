@@ -185,6 +185,11 @@ the target paths, then switch it live.
 | Notifications | on | Kodi toast after filing |
 | Update library | on | Targeted scan of the show or movie folder that changed |
 | OpenSubtitles API key | empty | Optional, unlocks stage 5 |
+| Telegram: announce | off | Post to a group when a movie or episode was filed |
+| Telegram: bot token | empty | From @BotFather |
+| Telegram: chat ID | empty | The group the bot posts to |
+| Telegram: text for movies | see below | Placeholder `{titel}` |
+| Telegram: text for shows | see below | Placeholders `{titel}`, `{staffel}`, `{episode}` |
 
 Target paths may be relative or absolute, but they have to sit on the same drive
 as the watched folder. The reason: moving is done purely with `os.rename`, which
@@ -199,6 +204,41 @@ the spelling of the matching source. Kodi compares paths as text, so a scan of
 `/media/MOVIES/Serien/`, even though one is a symlink to the other. If a target
 lies in no Kodi source, the add-on logs a warning instead of sending a scan that
 silently does nothing.
+
+## Telegram announcements
+
+Once something has really been filed, a bot can tell a group about it:
+
+```
+🎬 Der Film Blow (2001) wurde zu Kodi hinzugefügt.
+📺 Die Serie Nebula Station Staffel 4 Episode 8 wurde zu Kodi hinzugefügt.
+```
+
+Setting it up:
+
+1. Talk to [@BotFather](https://t.me/BotFather), send `/newbot` and copy the
+   token it gives you.
+2. Add the bot to your group and write any message there.
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and look
+   for `"chat":{"id":…}`. Group IDs are negative, for example `-1001234567890`.
+4. Enter token and chat ID in the add-on settings and switch the announcements
+   on.
+
+Both sentences can be changed in the settings. `{titel}` is replaced in either
+one, `{staffel}` and `{episode}` in the one for shows. A text with a typo in a
+placeholder falls back to the default sentence instead of swallowing the
+message.
+
+For shows the title is the one the lookup settled on, so the group reads
+`Nebula Station`, not `nbs`. For movies it is the readable part of the release
+name plus the year. A movie whose name says nothing is looked up by content
+when an OpenSubtitles API key is set; without a key the cleaned-up name is
+used as it is.
+
+One message is sent per filed item: a season pack gives one message per season
+(`Episode 1–10`), not one per file. Nothing is sent during a dry run or when
+an item ends up in the queue. If Telegram cannot be reached the log gets a
+warning and the message is not retried. The token never appears in the log.
 
 ## What it will not do
 

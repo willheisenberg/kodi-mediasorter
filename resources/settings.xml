@@ -72,5 +72,38 @@
         </setting>
       </group>
     </category>
+    <category id="telegram" label="Telegram">
+      <group id="1">
+        <setting id="telegram_enabled" type="boolean" label="Neue Filme und Folgen in Telegram melden">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle"/>
+        </setting>
+        <setting id="telegram_token" type="string" label="Bot-Token">
+          <level>0</level>
+          <default></default>
+          <constraints><allowempty>true</allowempty></constraints>
+          <control type="edit" format="string"/>
+        </setting>
+        <setting id="telegram_chat_id" type="string" label="Chat-ID der Gruppe">
+          <level>0</level>
+          <default></default>
+          <constraints><allowempty>true</allowempty></constraints>
+          <control type="edit" format="string"/>
+        </setting>
+        <setting id="telegram_text_film" type="string" label="Text für Filme ({titel})">
+          <level>0</level>
+          <default>🎬 Der Film {titel} wurde zu Kodi hinzugefügt.</default>
+          <constraints><allowempty>true</allowempty></constraints>
+          <control type="edit" format="string"/>
+        </setting>
+        <setting id="telegram_text_serie" type="string" label="Text für Serien ({titel}, {staffel}, {episode})">
+          <level>0</level>
+          <default>📺 Die Serie {titel} Staffel {staffel} Episode {episode} wurde zu Kodi hinzugefügt.</default>
+          <constraints><allowempty>true</allowempty></constraints>
+          <control type="edit" format="string"/>
+        </setting>
+      </group>
+    </category>
   </section>
 </settings>
