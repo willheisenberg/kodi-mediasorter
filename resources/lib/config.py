@@ -16,6 +16,29 @@ SCHLUESSEL_ZAHL = ("interval_seconds", "stability_cycles", "rar_quiet_seconds")
 SCHLUESSEL_JA_NEIN = ("dry_run", "notify", "library_scan", "telegram_enabled")
 
 
+def _byte(zeichen):
+    try:
+        return zeichen.encode("cp1252")
+    except UnicodeEncodeError:
+        if ord(zeichen) < 256:          # 0x81, 0x8d, 0x8f, 0x90, 0x9d
+            return bytes([ord(zeichen)])
+        raise
+
+
+def entwirre(text):
+    """Macht doppelt kodierten Text aus Kodi wieder lesbar.
+
+    Eine von Hand bearbeitete settings.xml traegt keine Kodierungsangabe.
+    Kodi liest ihre UTF-8-Bytes dann als Windows-1252, und aus hinzugefügt
+    wird hinzugefÃ¼gt. Richtiger Text uebersteht den Rueckweg nicht als
+    gueltiges UTF-8 und bleibt deshalb unveraendert.
+    """
+    try:
+        return b"".join(_byte(z) for z in text).decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+
+
 class Config:
     def __init__(self, werte):
         self.watch_path = werte["watch_path"]
@@ -48,7 +71,7 @@ class Config:
         addon = xbmcaddon.Addon()
         werte = {}
         for k in SCHLUESSEL_TEXT:
-            werte[k] = addon.getSetting(k)
+            werte[k] = entwirre(addon.getSetting(k))
         for k in SCHLUESSEL_ZAHL:
             werte[k] = addon.getSettingInt(k)
         for k in SCHLUESSEL_JA_NEIN:

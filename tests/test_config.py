@@ -138,3 +138,43 @@ def test_telegram_braucht_schalter_token_und_chat(tmp_path):
     assert c.telegram_chat_id == "-100"
     for fehlt in voll:
         assert basis(tmp_path, **dict(voll, **{fehlt: ""})).telegram_aktiv() is False
+
+
+# So liefert Kodi die Vorlagen aus einer von Hand bearbeiteten settings.xml:
+# die UTF-8-Bytes der Datei, als Windows-1252 gelesen. Werte von der Box.
+VERDREHT_SERIE = "\xf0Ÿ“\xba Die Serie {titel} wurde zu Kodi hinzugef\xc3\xbcgt."
+VERDREHT_FILM = "\xf0ŸŽ\xac Der Film {titel} wurde zu Kodi hinzugef\xc3\xbcgt."
+
+
+def test_entwirre_stellt_doppelt_kodierten_text_wieder_her():
+    assert config.entwirre(VERDREHT_SERIE) == "📺 Die Serie {titel} wurde zu Kodi hinzugefügt."
+    assert config.entwirre(VERDREHT_FILM) == "🎬 Der Film {titel} wurde zu Kodi hinzugefügt."
+
+
+def test_entwirre_kennt_auch_bytes_ohne_windows_1252_zeichen():
+    # U+1F34F enthaelt 0x8f, dafuer hat Windows-1252 kein Zeichen.
+    assert config.entwirre("\xf0Ÿ\x8d\x8f Apfel") == "🍏 Apfel"
+
+
+@pytest.mark.parametrize("text", [
+    "", "Der Film {titel}", "📺 Die Serie {titel} wurde hinzugefügt.",
+    "Für Zoë – schön", "123:abc", "-5052468228",
+])
+def test_entwirre_laesst_richtigen_text_in_ruhe(text):
+    assert config.entwirre(text) == text
+
+
+def test_aus_kodi_entwirrt_textwerte(kodi_stubs):
+    class Addon:
+        def getSetting(self, k):
+            return {"telegram_text_serie": VERDREHT_SERIE, "watch_path": "/tmp"}.get(k, "x")
+
+        def getSettingInt(self, k):
+            return 30
+
+        def getSettingBool(self, k):
+            return True
+
+    kodi_stubs["xbmcaddon"].Addon = Addon
+    c = config.Config.aus_kodi()
+    assert c.telegram_text_serie == "📺 Die Serie {titel} wurde zu Kodi hinzugefügt."
