@@ -210,8 +210,8 @@ silently does nothing.
 Once something has really been filed, a bot can tell a group about it:
 
 ```
-🎬 Der Film Blow (2001) wurde zu Kodi hinzugefügt.
-📺 Die Serie Nebula Station Staffel 4 Episode 8 wurde zu Kodi hinzugefügt.
+🎬 The movie Blow (2001) was added to Kodi.
+📺 The series Nebula Station Season 4 Episode 8 was added to Kodi.
 ```
 
 Setting it up:
@@ -236,7 +236,25 @@ when an OpenSubtitles API key is set; without a key the cleaned-up name is
 used as it is.
 
 One message is sent per filed item: a season pack gives one message per season
-(`Episode 1–10`), not one per file. Nothing is sent during a dry run or when
+(`Episode 1–10`), not one per file.
+
+Episodes of the same show that arrive one after another are collected in a
+single message. As long as the last message the add-on sent was about that
+show and is less than six hours old, it is replaced by one that lists the new
+episode as well:
+
+```
+📺 The series Nebula Station Season 1 Episode 1–4 & Season 2 Episode 1, 2 was added to Kodi.
+```
+
+Telegram cannot move an edited message to the end of the chat, so the add-on
+sends the longer message and deletes the old one. That keeps it at the bottom
+where people see it. The replacement is sent silently: only the first episode
+of such a run makes the phones buzz. A different show, a movie or a longer
+pause starts a new message. With a text of your own, the part from the word
+before `{staffel}` up to `{episode}` is what gets repeated per season.
+
+Nothing is sent during a dry run or when
 an item ends up in the queue. If Telegram cannot be reached the log gets a
 warning and the message is not retried. The token never appears in the log.
 

@@ -37,23 +37,23 @@ def aktive_cfg(**abweichungen):
 
 
 def test_standardsatz_fuer_film():
-    assert telegram.text_fuer(FILM) == "🎬 Der Film Blow (2001) wurde zu Kodi hinzugefügt."
+    assert telegram.text_fuer(FILM) == "🎬 The movie Blow (2001) was added to Kodi."
 
 
 def test_standardsatz_fuer_serie_nennt_staffel_und_episode():
     assert telegram.text_fuer(FOLGE) == (
-        "📺 Die Serie Nebula Station Staffel 4 Episode 8 wurde zu Kodi hinzugefügt."
+        "📺 The series Nebula Station Season 4 Episode 8 was added to Kodi."
     )
 
 
 def test_zusammenhaengende_episoden_als_bereich():
     paket = dict(FOLGE, episoden=[3, 1, 2])
-    assert "Staffel 4 Episode 1–3 wurde" in telegram.text_fuer(paket)
+    assert "Season 4 Episode 1–3 was" in telegram.text_fuer(paket)
 
 
 def test_lueckenhafte_episoden_als_liste():
     paket = dict(FOLGE, episoden=[1, 2, 5])
-    assert "Episode 1, 2, 5 wurde" in telegram.text_fuer(paket)
+    assert "Episode 1, 2, 5 was" in telegram.text_fuer(paket)
 
 
 def test_eigene_vorlagen_werden_benutzt():
@@ -119,7 +119,7 @@ def test_melde_sendet_eine_nachricht_pro_eintrag():
     assert telegram.melde(cfg, [FILM, FOLGE], oeffner) == 2
     assert texte == [
         "Film: Blow (2001)",
-        "📺 Die Serie Nebula Station Staffel 4 Episode 8 wurde zu Kodi hinzugefügt.",
+        "📺 The series Nebula Station Season 4 Episode 8 was added to Kodi.",
     ]
 
 
@@ -130,3 +130,129 @@ def test_melde_sendet_nichts_ohne_token_chat_oder_schalter():
     for abweichung in ({"telegram_enabled": False}, {"telegram_token": " "},
                        {"telegram_chat_id": ""}):
         assert telegram.melde(aktive_cfg(**abweichung), [FILM], oeffner) == 0
+
+
+class Gruppe:
+    """Nimmt Anfragen an wie Telegram und merkt sich Methode und Felder."""
+
+    def __init__(self, ablehnen=()):
+        self.anfragen = []
+        self.ablehnen = ablehnen
+
+    def __call__(self, anfrage, timeout=None):
+        methode = anfrage.full_url.rsplit("/", 1)[1]
+        felder = {k: v[0] for k, v in
+                  urllib.parse.parse_qs(anfrage.data.decode("utf-8")).items()}
+        self.anfragen.append((methode, felder))
+        if methode in self.ablehnen:
+            return Antwort({"ok": False, "description": "abgelehnt"})
+        return Antwort({"ok": True, "result": {"message_id": 100 + len(self.anfragen)}})
+
+    def methoden(self):
+        return [methode for methode, _felder in self.anfragen]
+
+
+def folge(staffel, episode, titel="Nebula Station"):
+    return {"typ": "serie", "titel": titel, "staffel": staffel, "episoden": [episode]}
+
+
+def test_mehrere_staffeln_wiederholen_den_staffelblock():
+    gesammelt = {"typ": "serie", "titel": "Nebula Station",
+                 "staffeln": {2: [1, 2], 1: [1, 2, 3, 4]}}
+    assert telegram.text_fuer(gesammelt) == (
+        "📺 The series Nebula Station Season 1 Episode 1–4 & Season 2 Episode 1–2"
+        " was added to Kodi."
+    )
+    assert telegram.text_fuer(
+        dict(gesammelt, staffeln={1: [1], 2: [3], 3: [5, 7]}),
+        vorlage_serie="{titel} S{staffel}E{episode} ist da",
+    ) == "Nebula Station S1E1, S2E3 & S3E5, 7 ist da"
+
+
+def test_vorlage_ohne_staffelblock_faellt_bei_mehreren_staffeln_auf_standard_zurueck():
+    gesammelt = {"typ": "serie", "titel": "Nebula Station", "staffeln": {1: [1], 2: [1]}}
+    assert telegram.text_fuer(gesammelt, vorlage_serie="Neues von {titel}") == (
+        telegram.text_fuer(gesammelt)
+    )
+
+
+def test_weitere_folge_derselben_serie_ersetzt_die_letzte_nachricht(tmp_path):
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    for takt, eintrag in enumerate([folge(1, 6), folge(1, 7), folge(2, 1)]):
+        assert telegram.melde(cfg, [eintrag], gruppe, merk, jetzt=1000 + 120 * takt) == 1
+
+    assert gruppe.methoden() == [
+        "sendMessage", "sendMessage", "deleteMessage", "sendMessage", "deleteMessage",
+    ]
+    assert "disable_notification" not in gruppe.anfragen[0][1]
+    assert gruppe.anfragen[1][1] == {
+        "chat_id": "-100200300", "disable_notification": "true",
+        "text": "📺 The series Nebula Station Season 1 Episode 6–7 was added to Kodi.",
+    }
+    assert gruppe.anfragen[2][1] == {"chat_id": "-100200300", "message_id": "101"}
+    assert "Season 1 Episode 6–7 & Season 2 Episode 1 was" in gruppe.anfragen[3][1]["text"]
+    assert gruppe.anfragen[4][1]["message_id"] == "102"
+
+
+def test_andere_serie_oder_film_beginnt_eine_neue_nachricht(tmp_path):
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    telegram.melde(cfg, [folge(1, 1), folge(1, 1, titel="Kupferstadt")], gruppe, merk, jetzt=1000)
+    telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1100)
+    telegram.melde(cfg, [folge(1, 2, titel="Kupferstadt"), FILM], gruppe, merk, jetzt=1200)
+    telegram.melde(cfg, [folge(1, 3, titel="Kupferstadt")], gruppe, merk, jetzt=1300)
+
+    assert gruppe.methoden() == [
+        "sendMessage", "sendMessage", "sendMessage", "sendMessage", "sendMessage",
+        "sendMessage",
+    ]
+    assert "Episode 3 was" in gruppe.anfragen[-1][1]["text"]
+
+
+def test_alte_nachricht_wird_nicht_mehr_bearbeitet(tmp_path):
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    telegram.melde(cfg, [folge(1, 1)], gruppe, merk, jetzt=1000)
+    telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1000 + 7 * 24 * 3600)
+
+    assert gruppe.methoden() == ["sendMessage", "sendMessage"]
+    assert "Episode 2 was" in gruppe.anfragen[1][1]["text"]
+
+
+def test_nicht_mehr_loeschbare_nachricht_haelt_das_sammeln_nicht_auf(tmp_path):
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe(ablehnen=("deleteMessage",))
+    cfg = aktive_cfg()
+
+    telegram.melde(cfg, [folge(1, 1)], gruppe, merk, jetzt=1000)
+    assert telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1100) == 1
+    telegram.melde(cfg, [folge(1, 3)], gruppe, merk, jetzt=1200)
+
+    assert gruppe.methoden() == [
+        "sendMessage", "sendMessage", "deleteMessage", "sendMessage", "deleteMessage",
+    ]
+    assert "Episode 1–3 was" in gruppe.anfragen[3][1]["text"]
+    assert gruppe.anfragen[4][1]["message_id"] == "102"
+
+
+def test_fehlgeschlagenes_senden_laesst_die_alte_nachricht_stehen(tmp_path):
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    telegram.melde(cfg, [folge(1, 1)], gruppe, merk, jetzt=1000)
+    gruppe.ablehnen = ("sendMessage",)
+    assert telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1100) == 0
+    gruppe.ablehnen = ()
+    telegram.melde(cfg, [folge(1, 3)], gruppe, merk, jetzt=1200)
+
+    assert gruppe.methoden() == ["sendMessage", "sendMessage", "sendMessage", "deleteMessage"]
+    assert "Episode 1, 3 was" in gruppe.anfragen[2][1]["text"]
+    assert gruppe.anfragen[3][1]["message_id"] == "101"

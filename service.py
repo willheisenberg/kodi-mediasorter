@@ -73,7 +73,10 @@ def main():
                     library.scanne(pfad)
             if zaehler["hinzugefuegt"]:
                 try:
-                    telegram.melde(cfg, zaehler["hinzugefuegt"])
+                    telegram.melde(
+                        cfg, zaehler["hinzugefuegt"],
+                        merkpfad=os.path.join(datenordner, "telegram.json"),
+                    )
                 except Exception as ausnahme:   # eine Meldung darf den Dienst nie beenden
                     log.error("Telegram-Meldung abgebrochen: %s" % type(ausnahme).__name__)
             if cfg.notify and zaehler["verschoben"]:

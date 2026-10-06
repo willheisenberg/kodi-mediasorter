@@ -93,13 +93,13 @@
         </setting>
         <setting id="telegram_text_film" type="string" label="Text für Filme ({titel})">
           <level>0</level>
-          <default>🎬 Der Film {titel} wurde zu Kodi hinzugefügt.</default>
+          <default>🎬 The movie {titel} was added to Kodi.</default>
           <constraints><allowempty>true</allowempty></constraints>
           <control type="edit" format="string"/>
         </setting>
         <setting id="telegram_text_serie" type="string" label="Text für Serien ({titel}, {staffel}, {episode})">
           <level>0</level>
-          <default>📺 Die Serie {titel} Staffel {staffel} Episode {episode} wurde zu Kodi hinzugefügt.</default>
+          <default>📺 The series {titel} Season {staffel} Episode {episode} was added to Kodi.</default>
           <constraints><allowempty>true</allowempty></constraints>
           <control type="edit" format="string"/>
         </setting>
