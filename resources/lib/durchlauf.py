@@ -109,6 +109,11 @@ def loese_titel(kandidat, cfg, zustand):
         return None                     # Filme brauchen keinen Titel-Lookup
 
     kandidaten = parser.titel_kandidaten(titelquelle) or parser.titel_kandidaten(name)
+    if titelquelle != name and parser.parse(name)["typ"] == "episode":
+        # Die Datei im Ordner kann auch nichtssagend heissen (tvr-sfsh-s01e01),
+        # waehrend der Ordner den Titel ausschreibt. Nur mit Episodenmarke:
+        # Ranger.S04.COMPLETE ergaebe keinen Titel, sondern Release-Reste.
+        kandidaten += [k for k in parser.titel_kandidaten(name) if k not in kandidaten]
     haupttitel = kandidaten[0] if kandidaten else None
     vorhandene = resolver.vorhandene_serien(cfg.ziel_serien())
 
@@ -162,6 +167,21 @@ def loese_titel(kandidat, cfg, zustand):
             return merke(gefunden, haupttitel, k)
         zustand.sperren("titel:" + k)
 
+    # Stufe 4b: uebersetzte Titel. TVmaze kennt nur den Originaltitel,
+    # Wikidata auch den deutschen samt TVmaze-Nummer.
+    wikidata_treffer = []
+    for k in kandidaten:
+        if k != haupttitel and len(k.replace(" ", "")) < 6:
+            continue
+        if zustand.gesperrt("wikidata:" + k):
+            continue
+        shows = resolver.wikidata_shows(k)
+        exakte = {show["id"]: show["name"] for exakt, show in shows if exakt}
+        if len(exakte) == 1:
+            return merke(next(iter(exakte.values())), haupttitel, k)
+        wikidata_treffer.extend(show for _exakt, show in shows)
+        zustand.sperren("wikidata:" + k)
+
     # Stufe 5: Inhaltserkennung, nur mit API-Key und nur fuer Einzeldateien
     if (cfg.opensubtitles_api_key and not kandidat["ist_ordner"]
             and not zustand.gesperrt("hash:" + pfad)):
@@ -175,7 +195,9 @@ def loese_titel(kandidat, cfg, zustand):
         zustand.sperren("hash:" + pfad)
 
     if haupttitel and not zustand.gesperrt("auswahl:" + haupttitel):
-        vorschlaege = resolver.serien_vorschlaege(haupttitel, vorhandene)
+        vorschlaege = resolver.serien_vorschlaege(
+            haupttitel, vorhandene, weitere=wikidata_treffer
+        )
         zustand.zuordnungen.vorschlagen(haupttitel, name, vorschlaege)
         zustand.sperren("auswahl:" + haupttitel)
     return None

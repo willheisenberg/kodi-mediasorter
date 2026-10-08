@@ -225,8 +225,89 @@ def tvmaze_per_name(titel, oeffner=None):
     return name
 
 
-def serien_vorschlaege(titel, vorhandene, oeffner=None):
-    """Alle Suchtreffer mit Jahr, Sender/Land und stabiler ID fuer die Auswahl."""
+_WIKIDATA = "https://www.wikidata.org/w/api.php?format=json&"
+_WIKIDATA_TREFFER = 5
+_WIKIDATA_AGENT = (
+    "service.mediasorter/0.1.0 (https://github.com/willheisenberg/kodi-mediasorter)"
+)
+_UMLAUTE = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+
+
+def _gefaltet(text):
+    """Wie _kompakt, aber Säure und Saeure werden gleich."""
+    return _kompakt(text.lower().translate(_UMLAUTE))
+
+
+def _wikidata(oeffner, abfrage):
+    # Wikimedia verlangt einen User-Agent mit Kontaktangabe und drosselt sonst.
+    return _json_von(oeffner, urllib.request.Request(
+        _WIKIDATA + abfrage, headers={"User-Agent": _WIKIDATA_AGENT}
+    ))
+
+
+def _wikidata_wert(entitaet, eigenschaft):
+    for aussage in (entitaet.get("claims") or {}).get(eigenschaft) or []:
+        wert = ((aussage.get("mainsnak") or {}).get("datavalue") or {}).get("value")
+        if isinstance(wert, str) and wert:
+            return wert
+    return None
+
+
+def wikidata_shows(titel, oeffner=None):
+    """Serien zu einem uebersetzten Titel, als Liste von (exakt, TVmaze-Show).
+
+    TVmaze kennt nur Originaltitel: Salz Fett Saeure Hitze findet dort nichts.
+    Wikidata fuehrt den deutschen Titel und dazu die TVmaze- oder IMDb-Nummer
+    der Serie. Eintraege ohne eine der beiden Nummern, etwa das Buch zur
+    Serie, fallen weg, ebenso Filme, die TVmaze nicht kennt.
+
+    exakt heisst: Bezeichnung oder Alias gleicht dem Suchtitel bis auf
+    Satzzeichen und Umlautschreibweise. Die Volltextsuche liefert auch
+    Aehnliches, und nur ein exakter Treffer darf ohne Rueckfrage zaehlen.
+    """
+    gesucht = _gefaltet(titel)
+    if not gesucht:
+        return []
+    daten = _wikidata(oeffner, "action=query&list=search&srlimit=%d&srsearch=%s"
+                      % (_WIKIDATA_TREFFER, urllib.parse.quote(titel)))
+    kennungen = [t.get("title") for t in ((daten or {}).get("query") or {}).get("search") or []]
+    kennungen = [k for k in kennungen if k]
+    if not kennungen:
+        return []
+    daten = _wikidata(oeffner, "action=wbgetentities&props=labels%7Caliases%7Cclaims"
+                      "&languages=de%7Cen&ids=" + "%7C".join(kennungen))
+    entitaeten = (daten or {}).get("entities") or {}
+
+    gefunden = {}
+    for kennung in kennungen:
+        entitaet = entitaeten.get(kennung) or {}
+        tvmaze = _wikidata_wert(entitaet, "P8600")
+        imdb = _wikidata_wert(entitaet, "P345")
+        if tvmaze:
+            show = _json_von(oeffner, "https://api.tvmaze.com/shows/"
+                             + urllib.parse.quote(tvmaze))
+        elif imdb:
+            show = _json_von(oeffner, "https://api.tvmaze.com/lookup/shows?imdb="
+                             + urllib.parse.quote(imdb))
+        else:
+            continue
+        if not (isinstance(show, dict) and show.get("name")
+                and isinstance(show.get("id"), int)):
+            continue
+        namen = [l.get("value") or "" for l in (entitaet.get("labels") or {}).values()]
+        for liste in (entitaet.get("aliases") or {}).values():
+            namen.extend(a.get("value") or "" for a in liste)
+        exakt = any(_gefaltet(n) == gesucht for n in namen)
+        vorher = gefunden.get(show["id"])
+        gefunden[show["id"]] = (exakt or bool(vorher and vorher[0]), show)
+    return list(gefunden.values())
+
+
+def serien_vorschlaege(titel, vorhandene, oeffner=None, weitere=()):
+    """Alle Suchtreffer mit Jahr, Sender/Land und stabiler ID fuer die Auswahl.
+
+    weitere sind TVmaze-Shows aus anderer Quelle, etwa wikidata_shows().
+    """
     vorschlaege = [{"id": "ordner:" + n, "ziel": n,
                     "beschreibung": n + " (vorhandener Serienordner)"}
                    for n in vorhandene if passt_abkuerzung(titel, n)]
@@ -237,6 +318,8 @@ def serien_vorschlaege(titel, vorhandene, oeffner=None):
         show = eintrag.get("show") or {}
         if isinstance(show.get("id"), int) and show.get("name"):
             shows[show["id"]] = show
+    for show in weitere:
+        shows.setdefault(show["id"], show)
     for sid, show in shows.items():
         name = show["name"]
         jahr = (show.get("premiered") or "")[:4]

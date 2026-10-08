@@ -197,21 +197,101 @@ def test_weitere_folge_derselben_serie_ersetzt_die_letzte_nachricht(tmp_path):
     assert gruppe.anfragen[4][1]["message_id"] == "102"
 
 
-def test_andere_serie_oder_film_beginnt_eine_neue_nachricht(tmp_path):
+def test_andere_serie_oder_film_dazwischen_unterbricht_das_sammeln_nicht(tmp_path):
+    """Der Fall von der Box: Heated Rivalry 2-3, dann Salt Fat Acid Heat, dann Folge 4."""
     merk = str(tmp_path / "telegram.json")
     gruppe = Gruppe()
     cfg = aktive_cfg()
 
-    telegram.melde(cfg, [folge(1, 1), folge(1, 1, titel="Kupferstadt")], gruppe, merk, jetzt=1000)
-    telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1100)
-    telegram.melde(cfg, [folge(1, 2, titel="Kupferstadt"), FILM], gruppe, merk, jetzt=1200)
-    telegram.melde(cfg, [folge(1, 3, titel="Kupferstadt")], gruppe, merk, jetzt=1300)
+    telegram.melde(cfg, [folge(1, 2), folge(1, 3)], gruppe, merk, jetzt=1000)
+    telegram.melde(cfg, [folge(1, 1, titel="Kupferstadt"), FILM], gruppe, merk, jetzt=1100)
+    telegram.melde(cfg, [folge(1, 4)], gruppe, merk, jetzt=1200)
+    telegram.melde(cfg, [folge(1, 2, titel="Kupferstadt")], gruppe, merk, jetzt=1300)
 
     assert gruppe.methoden() == [
-        "sendMessage", "sendMessage", "sendMessage", "sendMessage", "sendMessage",
-        "sendMessage",
+        "sendMessage",                                  # Nebula 2-3
+        "sendMessage", "sendMessage",                   # Kupferstadt 1, Film
+        "sendMessage", "deleteMessage",                 # Nebula 2-4 ersetzt 2-3
+        "sendMessage", "deleteMessage",                 # Kupferstadt 1-2 ersetzt 1
     ]
-    assert "Episode 3 was" in gruppe.anfragen[-1][1]["text"]
+    assert "Nebula Station Season 1 Episode 2–4 was" in gruppe.anfragen[3][1]["text"]
+    assert gruppe.anfragen[4][1]["message_id"] == "101"
+    assert "Kupferstadt Season 1 Episode 1–2 was" in gruppe.anfragen[5][1]["text"]
+    assert gruppe.anfragen[6][1]["message_id"] == "102"
+
+
+def test_ein_takt_ergibt_eine_nachricht_pro_serie(tmp_path):
+    gruppe = Gruppe()
+    eintraege = [folge(1, n, titel="Kupferstadt") for n in (1, 2, 3, 4)] + [folge(1, 4)]
+
+    assert telegram.melde(aktive_cfg(), eintraege, gruppe,
+                          str(tmp_path / "telegram.json"), jetzt=1000) == 2
+
+    assert gruppe.methoden() == ["sendMessage", "sendMessage"]
+    assert "Kupferstadt Season 1 Episode 1–4 was" in gruppe.anfragen[0][1]["text"]
+    assert "Nebula Station Season 1 Episode 4 was" in gruppe.anfragen[1][1]["text"]
+    assert not any("disable_notification" in f for _m, f in gruppe.anfragen)
+
+
+def test_folge_nach_ausgebliebener_antwort_wird_nachgetragen(tmp_path):
+    """Telegram antwortet nicht, die Nachricht kann trotzdem angekommen sein.
+
+    Ihre Nummer bleibt unbekannt, loeschen geht also nicht. Die naechste
+    Nachricht nennt die Folge deshalb noch einmal und klingelt, weil offen ist,
+    ob die erste je ankam.
+    """
+    merk = str(tmp_path / "telegram.json")
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    def antwortet_nicht(anfrage, timeout=None):
+        raise TimeoutError("timed out")
+
+    assert telegram.melde(cfg, [folge(1, 1)], antwortet_nicht, merk, jetzt=1000) == 0
+    assert telegram.melde(cfg, [folge(1, 2)], gruppe, merk, jetzt=1100) == 1
+    telegram.melde(cfg, [folge(1, 3)], gruppe, merk, jetzt=1200)
+
+    assert gruppe.methoden() == ["sendMessage", "sendMessage", "deleteMessage"]
+    assert "Episode 1–2 was" in gruppe.anfragen[0][1]["text"]
+    assert "disable_notification" not in gruppe.anfragen[0][1]
+    assert "Episode 1–3 was" in gruppe.anfragen[1][1]["text"]
+
+
+def test_merkdatei_im_alten_format_wird_weiter_verstanden(tmp_path):
+    merk = tmp_path / "telegram.json"
+    merk.write_text(json.dumps({
+        "chat_id": "-100200300", "message_id": 24, "titel": "Nebula Station",
+        "zeit": 1000, "staffeln": {"1": [4]},
+    }), encoding="utf-8")
+    gruppe = Gruppe()
+
+    telegram.melde(aktive_cfg(), [folge(1, 5)], gruppe, str(merk), jetzt=1100)
+
+    assert gruppe.methoden() == ["sendMessage", "deleteMessage"]
+    assert "Episode 4–5 was" in gruppe.anfragen[0][1]["text"]
+    assert gruppe.anfragen[1][1]["message_id"] == "24"
+
+
+def test_abgelaufene_serien_verschwinden_aus_der_merkdatei(tmp_path):
+    merk = tmp_path / "telegram.json"
+    gruppe = Gruppe()
+    cfg = aktive_cfg()
+
+    telegram.melde(cfg, [folge(1, 1, titel="Kupferstadt")], gruppe, str(merk), jetzt=1000)
+    telegram.melde(cfg, [folge(1, 1)], gruppe, str(merk), jetzt=1000 + 7 * 3600)
+
+    assert list(json.loads(merk.read_text(encoding="utf-8"))["serien"]) == ["Nebula Station"]
+
+
+def test_telegram_bekommt_dreissig_sekunden_zeit():
+    zeiten = []
+
+    def oeffner(anfrage, timeout=None):
+        zeiten.append(timeout)
+        return Antwort({"ok": True})
+
+    telegram.sende("123:GEHEIM", "1", "Hallo", oeffner)
+    assert zeiten == [30]
 
 
 def test_alte_nachricht_wird_nicht_mehr_bearbeitet(tmp_path):
@@ -242,7 +322,7 @@ def test_nicht_mehr_loeschbare_nachricht_haelt_das_sammeln_nicht_auf(tmp_path):
     assert gruppe.anfragen[4][1]["message_id"] == "102"
 
 
-def test_fehlgeschlagenes_senden_laesst_die_alte_nachricht_stehen(tmp_path):
+def test_fehlgeschlagenes_senden_laesst_die_alte_nachricht_stehen_und_traegt_nach(tmp_path):
     merk = str(tmp_path / "telegram.json")
     gruppe = Gruppe()
     cfg = aktive_cfg()
@@ -254,5 +334,5 @@ def test_fehlgeschlagenes_senden_laesst_die_alte_nachricht_stehen(tmp_path):
     telegram.melde(cfg, [folge(1, 3)], gruppe, merk, jetzt=1200)
 
     assert gruppe.methoden() == ["sendMessage", "sendMessage", "sendMessage", "deleteMessage"]
-    assert "Episode 1, 3 was" in gruppe.anfragen[2][1]["text"]
+    assert "Episode 1–3 was" in gruppe.anfragen[2][1]["text"]
     assert gruppe.anfragen[3][1]["message_id"] == "101"

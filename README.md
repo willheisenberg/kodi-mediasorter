@@ -88,10 +88,11 @@ from strong to weak and stops as soon as it has an answer:
 | 2 | Cache from earlier runs | no |
 | 3 | Match against existing folders, exact or by abbreviation | no |
 | 4 | TVmaze title search, also for run-together titles | yes |
+| 4b | Wikidata, for translated titles | yes |
 | 5 | OpenSubtitles hash over the file contents | yes, with key |
 | 6 | Queue, retried automatically | no |
 
-**TVmaze needs no API key and no registration.** Only stage 5 wants a free
+**TVmaze and Wikidata need no API key and no registration.** Only stage 5 wants a free
 OpenSubtitles key; without one, that stage is skipped.
 
 Stage 3 also resolves the short names release groups use, by testing whether the
@@ -119,6 +120,18 @@ Stage 4 decides on name equality, not on score distance. Two shows sharing a
 name — two seasons of the same franchise — cannot be told apart and are
 rejected. A title that matches the search term exactly, against a
 companion documentary with a longer name, can.
+
+TVmaze only knows original titles, so a German release such as
+`Salz.Fett.Saeure.Hitze.S01E01` finds nothing there. Stage 4b asks Wikidata,
+which lists the German title together with the show's TVmaze or IMDb number,
+and files the episode under the name TVmaze uses: `Salt Fat Acid Heat`. A hit
+counts only if its label or alias equals the search title, ignoring punctuation
+and the spelling of umlauts (`Saeure` and `Säure`). Anything looser, and two
+shows sharing the title, end up as options in `Mediasorter-Zuordnung.txt`
+instead of being guessed.
+
+A folder with an episode marker in its name also contributes its title when the
+file inside is named something unreadable like `tvr-sfsh-s01e01-1080p.mkv`.
 
 ## The queue clears itself
 
@@ -235,13 +248,14 @@ name plus the year. A movie whose name says nothing is looked up by content
 when an OpenSubtitles API key is set; without a key the cleaned-up name is
 used as it is.
 
-One message is sent per filed item: a season pack gives one message per season
-(`Episode 1–10`), not one per file.
+One message is sent per movie and one per show: everything of a show that is
+filed in the same tick, a season pack or several loose episodes, ends up in one
+message (`Episode 1–10`), not one per file.
 
-Episodes of the same show that arrive one after another are collected in a
-single message. As long as the last message the add-on sent was about that
-show and is less than six hours old, it is replaced by one that lists the new
-episode as well:
+Episodes of the same show that arrive later are collected in that message too.
+As long as the add-on's message about the show is less than six hours old, it
+is replaced by one that lists the new episode as well, even if other shows or
+movies were announced in between:
 
 ```
 📺 The series Nebula Station Season 1 Episode 1–4 & Season 2 Episode 1, 2 was added to Kodi.
@@ -250,13 +264,17 @@ episode as well:
 Telegram cannot move an edited message to the end of the chat, so the add-on
 sends the longer message and deletes the old one. That keeps it at the bottom
 where people see it. The replacement is sent silently: only the first episode
-of such a run makes the phones buzz. A different show, a movie or a longer
-pause starts a new message. With a text of your own, the part from the word
+of such a run makes the phones buzz. A pause of more than six hours starts a
+new message. With a text of your own, the part from the word
 before `{staffel}` up to `{episode}` is what gets repeated per season.
 
 Nothing is sent during a dry run or when
 an item ends up in the queue. If Telegram cannot be reached the log gets a
-warning and the message is not retried. The token never appears in the log.
+warning. A movie is then not announced again; episodes are kept and listed in
+the show's next message. When Telegram merely answers too late, the message may
+have arrived anyway. The add-on never learns its number and cannot replace it,
+so that one stays, followed by a complete message once the next episode comes
+in. The token never appears in the log.
 
 ## What it will not do
 

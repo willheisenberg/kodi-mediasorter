@@ -64,7 +64,7 @@ def test_auswahl_fuehrt_zum_verschieben_auch_bei_sperre_und_neustart(tmp_path, m
     monkeypatch.setattr(resolver, 'tvmaze_per_name', lambda *a: None)
     monkeypatch.setattr(resolver, 'tvmaze_zusammengeschrieben', lambda *a: None)
     aufrufe = []
-    monkeypatch.setattr(resolver, 'serien_vorschlaege', lambda *a: aufrufe.append(a) or vorschlaege())
+    monkeypatch.setattr(resolver, 'serien_vorschlaege', lambda *a, **kw: aufrufe.append(a) or vorschlaege())
     cfg, zustand = baue_umgebung(tmp_path)
     quelle = tmp_path / 'example.s01e01.mkv'
     quelle.write_bytes(b'video')

@@ -545,3 +545,104 @@ def test_ohne_telegram_kein_inhaltsabruf_fuer_filme(tmp_path, monkeypatch):
         gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
 
     assert gemeldet == [{"typ": "film", "titel": "bhx-neohar"}]
+
+
+SALZ_ORDNER = "Salz.Fett.Saeure.Hitze.S01E01.Fett.GERMAN.5.1.DL.EAC3.1080p.WEB-DL.x264-TvR"
+
+
+def ohne_tvmaze(monkeypatch, wikidata):
+    """TVmaze kennt nichts; wikidata ist titel -> Liste von (exakt, show)."""
+    import resolver
+
+    gefragt = []
+
+    def shows(titel, oeffner=None):
+        gefragt.append(titel)
+        return wikidata.get(titel, [])
+
+    monkeypatch.setattr(resolver, "tvmaze_per_name", lambda t, oeffner=None: None)
+    monkeypatch.setattr(resolver, "tvmaze_zusammengeschrieben", lambda t, oeffner=None: None)
+    monkeypatch.setattr(resolver, "serien_vorschlaege",
+                        lambda t, vorhandene, oeffner=None, weitere=(): [
+                            {"id": "tvmaze:%s" % s["id"], "ziel": s["name"],
+                             "beschreibung": s["name"]} for s in weitere])
+    monkeypatch.setattr(resolver, "wikidata_shows", shows)
+    return gefragt
+
+
+def salz_ordner(tmp_path):
+    ordner = tmp_path / SALZ_ORDNER
+    ordner.mkdir()
+    (ordner / "tvr-sfsh-s01e01-1080p.mkv").write_bytes(b"x" * 100)
+    return ordner
+
+
+def test_deutscher_ordnername_wird_ueber_wikidata_aufgeloest(tmp_path, monkeypatch):
+    """Der Fall von der Box: Datei heisst tvr-sfsh, der Ordner traegt den Titel."""
+    gefragt = ohne_tvmaze(monkeypatch, {"salz fett saeure hitze": [
+        (True, {"id": 38024, "name": "Salt Fat Acid Heat"})]})
+    cfg, zustand = baue_umgebung(tmp_path)
+    salz_ordner(tmp_path)
+
+    gemeldet = []
+    for _ in range(4):
+        gemeldet.extend(durchlauf.einmal(cfg, zustand)["hinzugefuegt"])
+
+    ziel = tmp_path / "Serien" / "Salt Fat Acid Heat" / "Season 01" / SALZ_ORDNER
+    assert (ziel / "tvr-sfsh-s01e01-1080p.mkv").exists()
+    assert gemeldet == [
+        {"typ": "serie", "titel": "Salt Fat Acid Heat", "staffel": 1, "episoden": [1]}
+    ]
+    assert gefragt.count("salz fett saeure hitze") == 1, "danach greift der Cache"
+
+
+def test_unsicherer_wikidata_treffer_wird_nur_vorgeschlagen(tmp_path, monkeypatch):
+    ohne_tvmaze(monkeypatch, {"salz fett saeure hitze": [
+        (False, {"id": 38024, "name": "Salt Fat Acid Heat"})]})
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = salz_ordner(tmp_path)
+
+    stabil_machen(cfg, zustand, takte=4)
+
+    assert ordner.exists()
+    assert zustand.warteschlange.anzahl() == 1
+    auswahl = (tmp_path / "Mediasorter-Zuordnung.txt").read_text(encoding="utf-8")
+    assert "Zielordner: Salt Fat Acid Heat" in auswahl
+
+
+def test_zwei_exakte_wikidata_serien_werden_nicht_geraten(tmp_path, monkeypatch):
+    ohne_tvmaze(monkeypatch, {"salz fett saeure hitze": [
+        (True, {"id": 1, "name": "Salt Fat Acid Heat"}),
+        (True, {"id": 2, "name": "Salz Fett Säure Hitze"})]})
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = salz_ordner(tmp_path)
+
+    stabil_machen(cfg, zustand, takte=4)
+
+    assert ordner.exists()
+    assert zustand.warteschlange.anzahl() == 1
+
+
+def test_wikidata_suche_ruht_nach_fehlschlag(tmp_path, monkeypatch):
+    gefragt = ohne_tvmaze(monkeypatch, {})
+    cfg, zustand = baue_umgebung(tmp_path)
+    salz_ordner(tmp_path)
+
+    stabil_machen(cfg, zustand, takte=6)
+
+    assert gefragt.count("salz fett saeure hitze") == 1
+    assert gefragt.count("tvr sfsh") == 1
+
+
+def test_ordnername_ohne_episodenmarke_wird_nicht_gesucht(tmp_path, monkeypatch):
+    """Ranger.S04.COMPLETE ist kein Titel und darf nicht online gefragt werden."""
+    gefragt = ohne_tvmaze(monkeypatch, {})
+    cfg, zustand = baue_umgebung(tmp_path)
+    ordner = tmp_path / "Ranger.S04.COMPLETE.German.1080p.WEB.h264-CREW"
+    ordner.mkdir()
+    (ordner / "ranger.s04e01.mkv").write_bytes(b"x")
+    (ordner / "ranger.s04e02.mkv").write_bytes(b"x")
+
+    stabil_machen(cfg, zustand, takte=4)
+
+    assert gefragt == ["ranger"]

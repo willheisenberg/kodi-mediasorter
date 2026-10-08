@@ -233,3 +233,110 @@ def test_serien_vorschlaege_listen_alle_ids_mit_unterscheidbaren_zielen():
 def test_serien_vorschlaege_behalten_lokale_treffer_bei_netzfehler():
     result = resolver.serien_vorschlaege('ns', ['Night Signal', 'Nebula Station'], oeffner_404())
     assert {r['ziel'] for r in result} == {'Night Signal', 'Nebula Station'}
+
+
+# --- Wikidata: deutscher Titel -> Originalserie ---
+
+def wikidata_oeffner(suche, entitaeten, shows, aufrufe=None):
+    """Beantwortet Wikidata-Suche, Wikidata-Details und TVmaze nach Adresse."""
+    def oeffnen(ziel, timeout=None):
+        url = getattr(ziel, "full_url", ziel)
+        if aufrufe is not None:
+            aufrufe.append(url)
+        if "list=search" in url:
+            daten = {"query": {"search": [{"title": q} for q in suche]}}
+        elif "wbgetentities" in url:
+            daten = {"entities": entitaeten}
+        else:
+            schluessel = url.rsplit("/", 1)[-1].rsplit("=", 1)[-1]
+            if schluessel not in shows:
+                raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+            daten = shows[schluessel]
+        return FakeAntwort(json.dumps(daten).encode("utf-8"))
+    return oeffnen
+
+
+def entitaet(de=None, en=None, alias_de=(), tvmaze=None, imdb=None):
+    claims = {}
+    if tvmaze:
+        claims["P8600"] = [{"mainsnak": {"datavalue": {"value": tvmaze}}}]
+    if imdb:
+        claims["P345"] = [{"mainsnak": {"datavalue": {"value": imdb}}}]
+    labels = {s: {"value": w} for s, w in (("de", de), ("en", en)) if w}
+    return {"labels": labels, "claims": claims,
+            "aliases": {"de": [{"value": a} for a in alias_de]}}
+
+
+SALZ = {"id": 38024, "name": "Salt Fat Acid Heat", "premiered": "2018-10-11"}
+
+
+def test_wikidata_findet_serie_ueber_deutschen_titel():
+    aufrufe = []
+    oeffnen = wikidata_oeffner(
+        ["Q57262935"],
+        {"Q57262935": entitaet(de="Salz. Fett. Säure. Hitze.", en="Salt Fat Acid Heat",
+                               tvmaze="38024", imdb="tt8772088")},
+        {"38024": SALZ}, aufrufe)
+    assert resolver.wikidata_shows("salz fett saeure hitze", oeffnen) == [(True, SALZ)]
+    assert "srsearch=salz%20fett%20saeure%20hitze" in aufrufe[0]
+    assert aufrufe[-1] == "https://api.tvmaze.com/shows/38024"
+
+
+def test_wikidata_alias_zaehlt_als_exakter_titel():
+    oeffnen = wikidata_oeffner(
+        ["Q1"], {"Q1": entitaet(de="Etwas anderes", alias_de=["Die Brücke"], tvmaze="7")},
+        {"7": {"id": 7, "name": "Bron"}})
+    assert resolver.wikidata_shows("die bruecke", oeffnen) == [(True, {"id": 7, "name": "Bron"})]
+
+
+def test_wikidata_markiert_abweichenden_titel_als_unsicher():
+    oeffnen = wikidata_oeffner(
+        ["Q1"], {"Q1": entitaet(de="Die Brücke am Fluss", tvmaze="7")},
+        {"7": {"id": 7, "name": "Bron"}})
+    assert resolver.wikidata_shows("die bruecke", oeffnen) == [(False, {"id": 7, "name": "Bron"})]
+
+
+def test_wikidata_nimmt_imdb_wenn_tvmaze_nummer_fehlt():
+    oeffnen = wikidata_oeffner(
+        ["Q1"], {"Q1": entitaet(de="Beispiel", imdb="tt1234567")},
+        {"tt1234567": {"id": 9, "name": "Example"}})
+    assert resolver.wikidata_shows("beispiel", oeffnen) == [(True, {"id": 9, "name": "Example"})]
+
+
+def test_wikidata_ueberspringt_eintraege_ohne_serie():
+    """Buch ohne Nummern und Film, den TVmaze nicht kennt."""
+    oeffnen = wikidata_oeffner(
+        ["Q1", "Q2", "Q3"],
+        {"Q1": entitaet(de="Beispiel"), "Q2": entitaet(de="Beispiel", imdb="tt0000001"),
+         "Q3": entitaet(de="Beispiel", tvmaze="9")},
+        {"9": {"id": 9, "name": "Example"}})
+    assert resolver.wikidata_shows("beispiel", oeffnen) == [(True, {"id": 9, "name": "Example"})]
+
+
+def test_wikidata_meldet_dieselbe_serie_nur_einmal():
+    oeffnen = wikidata_oeffner(
+        ["Q1", "Q2"],
+        {"Q1": entitaet(de="Anderer Name", tvmaze="9"), "Q2": entitaet(de="Beispiel", tvmaze="9")},
+        {"9": {"id": 9, "name": "Example"}})
+    assert resolver.wikidata_shows("beispiel", oeffnen) == [(True, {"id": 9, "name": "Example"})]
+
+
+def test_wikidata_ohne_treffer_fragt_nicht_weiter():
+    aufrufe = []
+    assert resolver.wikidata_shows("tvr sfsh", wikidata_oeffner([], {}, {}, aufrufe)) == []
+    assert len(aufrufe) == 1
+
+
+def test_wikidata_netzfehler_ergibt_keine_treffer():
+    def kaputt(ziel, timeout=None):
+        raise OSError("kein Netz")
+
+    assert resolver.wikidata_shows("beispiel", kaputt) == []
+
+
+def test_serien_vorschlaege_nehmen_weitere_shows_ohne_doppelte_auf():
+    daten = [{"show": {"id": 1, "name": "Example", "premiered": "2020-01-01"}}]
+    weitere = [{"id": 1, "name": "Example", "premiered": "2020-01-01"}, SALZ]
+    result = resolver.serien_vorschlaege("example", [], oeffner_mit(daten), weitere)
+    assert [r["id"] for r in result] == ["tvmaze:1", "tvmaze:38024"]
+    assert result[1]["ziel"] == "Salt Fat Acid Heat"
